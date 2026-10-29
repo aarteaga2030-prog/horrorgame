@@ -2,7 +2,7 @@
 
 A first-person found-footage horror game in a Backrooms-style maze, built with Three.js.
 
-You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper and the hum of fluorescent lights, forever. The camcorder is still recording. Someone was here before you and left five notes on the walls. Find them, then find the exit. A six-foot thing with a permanent grin walks the halls.
+You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper and dead lights. It's pitch black, and your flashlight is the only light. The camcorder is still recording. Someone was here before you and left five notes on the walls. Find them, then find the exit. A six-foot thing with a permanent grin walks the halls.
 
 ## The monster
 
@@ -16,11 +16,15 @@ It uses `smily_horror_monster.glb`, scaled to stand 6 feet tall. Every movement 
 - **Chases on all fours**, with each hand and foot planting on the floor.
 - **Grabs your face** if it catches you.
 
+## The rule
+
+It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. But your flashlight flickers when it's close, and in every dark flicker it lurches toward you. The closer it gets, the more the light flickers.
+
 ## How to survive
 
-- It loses you when it can't see or hear you. Break line of sight at corners, then crouch.
-- Running is loud. Walking near it is loud too.
-- Some areas have dead lights. Your camera light (F) helps you see, but the lights flicker when it's close.
+- Keep the beam on it and back away.
+- Look away and it comes fast. If it's been out of sight too long, it gets behind you.
+- Turning the light off (F) lets it move freely.
 - Your map (M) shows where you've been, and the exit once all five notes are found.
 - If it catches you, rewind the tape. You keep your notes.
 
@@ -31,7 +35,7 @@ It uses `smily_horror_monster.glb`, scaled to stand 6 feet tall. Every movement 
 | Move / run / crouch | W A S D / Shift / C |
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
 | Read a note / open the door | E |
-| Camera light | F |
+| Flashlight on/off | F |
 | Map | M |
 
 ## Play
