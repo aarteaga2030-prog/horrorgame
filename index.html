@@ -546,6 +546,37 @@ function openExit(){
   G.exitOpen=true;SND.door();
 }
 
+/* ============ HABITS (learned, remembered per browser) ============ */
+const HKEY='noclip-habits-v1';
+const H={turnL:0,turnR:0,behind:0,playT:0,stareSum:0,stareN:0,runT:0,lightOffT:0,games:0};
+try{const j=JSON.parse(localStorage.getItem(HKEY)||'null');if(j)Object.assign(H,j)}catch(e){}
+function saveH(){try{localStorage.setItem(HKEY,JSON.stringify(H))}catch(e){}}
+let prevYaw=null,yawHist=[],behindCool=0,saveT=5;const told={};
+function trackHabits(dt,run){
+  H.playT+=dt;if(run)H.runT+=dt;if(!G.light)H.lightOffT+=dt;
+  if(prevYaw!=null){const d=angDiff(prevYaw,player.yaw);if(d>.002)H.turnL+=d;else if(d<-.002)H.turnR-=d;
+    yawHist.push({t:G.time,d});while(yawHist.length&&G.time-yawHist[0].t>1.3)yawHist.shift();
+    behindCool-=dt;if(behindCool<=0){let tot=0;for(const h of yawHist)tot+=h.d;if(Math.abs(tot)>2.4){H.behind++;behindCool=2.5;yawHist=[]}}}
+  prevYaw=player.yaw;saveT-=dt;if(saveT<=0){saveT=5;saveH()}
+}
+function habits(){const tt=H.turnL+H.turnR;const mins=Math.max(.5,H.playT/60);
+  return{leftBias:tt>25?(H.turnL-H.turnR)/tt:0,behindRate:H.behind/mins,stare:H.stareN>=3?H.stareSum/H.stareN:2.6,runFrac:H.runT/Math.max(1,H.playT),known:H.playT>45}}
+function playerLeft(){return new V3(-Math.cos(player.yaw),0,Math.sin(player.yaw))}
+function playerFwd(){return new V3(-Math.sin(player.yaw),0,-Math.cos(player.yaw))}
+// score bonus for approaching from the side the player checks least, and from behind if they rarely look back
+function blindBonus(vx,vz){const hb=habits();const L=playerLeft(),F=playerFwd();const left=vx*L.x+vz*L.z,back=-(vx*F.x+vz*F.z);
+  return -left*hb.leftBias*2+back*(hb.behindRate<1.2?1.2:hb.behindRate>4?-.4:.4)}
+function habitLines(){const hb=habits(),out=[];
+  if(Math.abs(hb.leftBias)>.2)out.push(`you always turn ${hb.leftBias>0?'left':'right'} first`);
+  if(hb.behindRate<1.2)out.push('you almost never look behind you');else if(hb.behindRate>4)out.push('you check behind you, so it comes from the side');
+  if(H.stareN>=3)out.push(`you hold the light on it for about ${hb.stare.toFixed(1)} seconds`);
+  if(hb.runFrac>.35)out.push('you run a lot, and it can hear you');
+  return out}
+function maybeTell(){const hb=habits();
+  if(!told.turn&&Math.abs(hb.leftBias)>.3&&H.turnL+H.turnR>40){told.turn=1;caption(`[It has noticed you always turn ${hb.leftBias>0?'left':'right'}.]`);return}
+  if(!told.back&&hb.known&&hb.behindRate<1){told.back=1;caption('[It knows you never look behind you.]');return}
+  if(!told.stare&&H.stareN>=4){told.stare=1;caption('[It is learning how long you can stare.]')}}
+
 /* ============ VISIBILITY & AI ============ */
 const _pv=new V3();
 function canSee(x,y,z){
@@ -564,7 +595,7 @@ function monsterInView(){if(!MON.visible||!CR)return false;const h=CR.B.head_05.
 function monsterSeen(){if(!MON.visible||!CR)return false;const h=CR.B.head_05.getWorldPosition(new V3()),c=CR.B.chest_03.getWorldPosition(new V3());return canSee(h.x,h.y,h.z)||canSee(c.x,c.y,c.z)}
 const AI={state:'hidden',t:0,next:10,seen:0,unseen:0,chain:0,flag:false,first:true,sub:0,t2:0,spot:null,lastKnown:new V3(),lost:0,path:[],pi:0,field:null,fieldKey:-1,gig:4};
 function aggression(){return clamp(.12+G.notes*.17+G.time/1000,0,1)}
-function setAI(s){AI.state=s;AI.t=0;AI.seen=0;AI.unseen=0;AI.sub=0;AI.t2=0;AI.flag=false;AI.mode=null;AI.goal=null;AI.wait=0;AI.flanks=0;AI.planT=0}
+function setAI(s){AI.dash=false;AI.litStreak=0;AI.state=s;AI.t=0;AI.seen=0;AI.unseen=0;AI.sub=0;AI.t2=0;AI.flag=false;AI.mode=null;AI.goal=null;AI.wait=0;AI.flanks=0;AI.planT=0}
 function hideMonster(next){MON.visible=false;MON.frozen=false;if(CR)CR.root.visible=false;setAI('hidden');AI.next=next;MON.pos.set(-50,0,-50)}
 function showMonster(){MON.visible=true;if(CR)CR.root.visible=true}
 function navTo(tx,tz,speed,dt){
@@ -706,22 +737,30 @@ function updateAIOld(dt){
   if(MON.visible&&dP<6&&rnd()<dt*1.2)flickerNear();
 }
 function farCell(){let best=null,bd=0;for(let t=0;t<60;t++){const x=rnd()*GW|0,y=rnd()*GH|0;const cx=(x+.5)*CS,cz=(y+.5)*CS,d=Math.hypot(cx-player.x,cz-player.z);if(d>bd){bd=d;best=new V3(cx,0,cz)}}return best}
-function kill(){if(G.state!=='play')return;G.state='dying';G.scareT=0;setAI('grab');SND.jump();SND.scream();$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
+function kill(){if(G.state!=='play')return;saveH();G.state='dying';G.scareT=0;setAI('grab');SND.jump();SND.scream();$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
 function findFlank(dmin,dmax,behindPref){
   const[mx,my]=cellOf(MON.pos.x,MON.pos.z);const f=cellBFS(mx,my);
   const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
   const[pcx,pcy]=cellOf(player.x,player.z);const pf=cellBFS(pcx,pcy);
   let best=null,bs=-1e9;
-  cellsAround(dmin,dmax,(x,y,cx,cz,d)=>{const pd=f[y*GW+x];if(pd<0||pd>12)return;if(pf[y*GW+x]<0||pf[y*GW+x]>8)return;
+  cellsAround(dmin,dmax,(x,y,cx,cz,d)=>{const pd=f[y*GW+x];if(pd<0||pd>14)return;if(pf[y*GW+x]<0||pf[y*GW+x]>12)return;
     if(losXZ(player.x,player.z,cx,cz))return;
     const vx=(cx-player.x)/d,vz=(cz-player.z)/d;const behind=(1-(vx*fw.x+vz*fw.z))/2;const ang=Math.atan2(vz,vx);
     const around=AI.lastAng!=null?Math.abs(angDiff(AI.lastAng,ang))/Math.PI:0;
-    const sc=behind*behindPref*3+around*.8-pd*.22-pf[y*GW+x]*.15+rnd()*.7;
+    const sc=behind*behindPref*2+blindBonus(vx,vz)+around*.8-pd*.2-pf[y*GW+x]*.12+rnd()*.6;
     if(sc>bs){bs=sc;best={x:cx,z:cz,ang}}});
   return best}
+function findCoverNear(){
+  const[mx,my]=cellOf(MON.pos.x,MON.pos.z);const f=cellBFS(mx,my);const dNow=Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z);let best=null,bs=-1e9;
+  for(let y=my-3;y<=my+3;y++)for(let x=mx-3;x<=mx+3;x++){if(!inCell(x,y))continue;const pd=f[y*GW+x];if(pd<1||pd>4)continue;
+    const cx=(x+.5)*CS,cz=(y+.5)*CS;if(losWide(player.x,player.z,cx,cz,.35))continue;
+    const d=Math.hypot(cx-player.x,cz-player.z),vx=(cx-player.x)/d,vz=(cz-player.z)/d;
+    const sc=-pd*.7-(d-dNow)*.45+blindBonus(vx,vz)*.6+rnd()*.5;if(sc>bs){bs=sc;best={x:cx,z:cz,ang:Math.atan2(vz,vx)}}}
+  return best}
+function forceFlicks(n){const t=G.time;G.fq=[];for(let i=0;i<n;i++)G.fq.push(t+i*(.2+rnd()*.12))}
 function relocateBehind(){
   const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
-  for(let t=0;t<50;t++){const a=Math.atan2(fw.x,fw.z)+Math.PI+(rnd()-.5)*1.4,d=4+rnd()*4;const x=player.x+Math.sin(a)*d,z=player.z+Math.cos(a)*d;
+  for(let t=0;t<50;t++){const hb=habits();const a=Math.atan2(fw.x,fw.z)+Math.PI+(rnd()-.5)*1.0-hb.leftBias*.9,d=4+rnd()*4;const x=player.x+Math.sin(a)*d,z=player.z+Math.cos(a)*d;
     if(x<1||z<1||x>GW*CS-1||z>GH*CS-1||nearestWall(x,z).d<.4)continue;if(inViewPt(x,1.2,z))continue;
     const f=cellBFS(...cellOf(player.x,player.z));const c=cellOf(x,z);const v=f[c[1]*GW+c[0]];if(v<0||v>5)continue;
     placeMonster(x,z,Math.atan2(player.x-x,player.z-z),AI.style==='crawl'?0:1);AI.unseen=0;SND.click();caption('[Something is right behind you.]');return true}
@@ -740,7 +779,10 @@ function updateAI(dt){
   const lit=monsterLit(),inV=lit||monsterInView();
   MON.frozen=lit&&AI.state!=='hidden';
   if(lit){AI.seen+=dt;AI.unseen=0}else if(!inV)AI.unseen+=dt;AI.t+=dt;
-  G.flickRate=MON.visible?(dP<15?(1-dP/15)*(1.25+G.notes*.22+(G.exitOpen?1.1:0)):.05):.03;
+  AI.litStreak=lit?(AI.litStreak||0)+dt:Math.max(0,(AI.litStreak||0)-dt*.5);
+  if(inV&&MON.visible){AI.watchT=(AI.watchT||0)+dt;AI.watchGap=0}else{AI.watchGap=(AI.watchGap||0)+dt;if(AI.watchGap>.5&&AI.watchT>.4){H.stareSum+=Math.min(15,AI.watchT);H.stareN++;AI.watchT=0}else if(AI.watchGap>.5)AI.watchT=0}
+  G.flickRate=MON.visible?((dP<15?(1-dP/15)*(1.25+G.notes*.22+(G.exitOpen?1.1:0)):.05)+(lit?Math.min(2.2,.35+AI.litStreak*.55):0)):.03;
+  AI.tellT=(AI.tellT||20)-dt;if(AI.tellT<=0){AI.tellT=25;maybeTell()}
   if(lit&&!AI.wasLit&&MON.visible){if(AI.moved>.35&&dP<8){SND.sting();G.glitch=.7;if(dP<4)caption(pick(['[It is closer.]','[Don\'t blink.]','[Keep the light on it.]']))}AI.moved=0}
   AI.wasLit=lit;
   const I=INTENT;
@@ -761,6 +803,10 @@ function updateAI(dt){
     AI.styleT=(AI.styleT==null?2:AI.styleT)-dt;
     if(AI.styleT<=0){const want=AI.mode==='flank'?(rnd()<.7?'crawl':'walk'):(rnd()<.45?'crawl':'walk');if(want!==AI.style){AI.style=want;if(MON.visible&&dP<12)SND.click()}AI.styleT=(lit?.8:1.4)+rnd()*2.6}
     const flick=G.light&&G.flickOff>0;
+    const hbS=habits();const stareLimit=clamp(hbS.stare*.55,.7,2.2);
+    if(lit&&AI.litStreak>stareLimit&&!AI.dash){const c=findCoverNear();if(c){AI.mode='flank';AI.goal=c;AI.dash=true;AI.planT=3;AI.lastAng=c.ang;AI.style=rnd()<.6?'crawl':AI.style;forceFlicks(3+(rnd()*2|0))}else{AI.dash=true;forceFlicks(2)}}
+    if(AI.dash&&!lit&&!inV){AI.dash=false;AI.litStreak=0}
+    if(AI.dash&&AI.goal&&Math.hypot(AI.goal.x-MON.pos.x,AI.goal.z-MON.pos.z)<.6){AI.dash=false}
     // planning
     AI.planT=(AI.planT||0)-dt;const atGoalX=AI.goal&&Math.hypot(AI.goal.x-MON.pos.x,AI.goal.z-MON.pos.z)<.7,atGoal=atGoalX;
     const goalBad=AI.goal&&losXZ(player.x,player.z,AI.goal.x,AI.goal.z);
@@ -780,10 +826,10 @@ function updateAI(dt){
     if(AI.hold>0){AI.hold-=dt;stopMove(dt);faceTo(player.x,player.z,dt,1);break}
     if(AI.wait>0&&!flick){AI.wait-=dt;stopMove(dt);faceTo(player.x,player.z,dt,2);I.tilt=.9;break}
     let sp;
-    if(flick)sp=crawl?9:7.2;
+    if(flick)sp=AI.dash?(crawl?11:9):(crawl?9:7.2);
     else if(inV)sp=crawl?3.6:2.8;
-    else sp=(crawl?4.3:2.5)+a*.9+(G.exitOpen?.8:0);
-    if(AI.mode==='flank'&&AI.goal)navTo(AI.goal.x,AI.goal.z,sp,dt);else navTo(player.x,player.z,sp,dt);
+    else{sp=(crawl?4.3:2.5)+a*.9+(G.exitOpen?.8:0);if(AI.mode!=='flank')sp=Math.min(sp,1.3+dP*.4)}
+    if(AI.mode==='flank'&&AI.goal)navTo(AI.goal.x,AI.goal.z,sp,dt);else{const lead=dP>3?Math.min(1.2,dP/6):0;const tx=player.x+(player.vx||0)*lead,tz=player.z+(player.vz||0)*lead;navTo(losXZ(player.x,player.z,tx,tz)?tx:player.x,losXZ(player.x,player.z,tx,tz)?tz:player.z,sp,dt)}
     if(AI.mode==='flank'&&!inV&&!losXZ(MON.pos.x,MON.pos.z,player.x,player.z)&&MON.speed>2&&rnd()<dt*1.5)SND.slap(.5);
     AI.moved+=MON.speed*dt;
     if(dP<.95){kill();break}
@@ -809,7 +855,8 @@ function flickerNear(){for(const p of panels){if(!p.alive)continue;if(Math.hypot
 let dynT=0;
 function updateLights(dt){
   G.power=0;DYN.forEach(dl=>dl.L.intensity=0);
-  if(G.state==='play'&&!G.paused){G.flickOff-=dt;if(G.flickOff<=0&&G.light&&rnd()<G.flickRate*dt){G.flickOff=.06+rnd()*.09;SND.flick()}}
+  if(G.state==='play'&&!G.paused){G.flickOff-=dt;if(G.fq&&G.fq.length&&G.time>=G.fq[0]){G.fq.shift();if(G.light){G.flickOff=.17+rnd()*.1;SND.flick();G.glitch=Math.max(G.glitch,.5)}}
+    else if(G.flickOff<=0&&G.light&&rnd()<G.flickRate*dt){G.flickOff=.06+rnd()*.09;SND.flick()}}
   else if(G.state!=='dying')G.flickOff=0;
   G.lightNow=G.state==='dying'?rnd()<.55:(G.light&&G.flickOff<=0);
   flash.intensity=G.lightNow?20:0;spill.intensity=G.lightNow?.35:0;
@@ -825,14 +872,14 @@ function hideScreen(){scr.hidden=true;scr.innerHTML=''}
 let modelReady=false;
 function showTitle(){
   show(`<div class="tape"><div class="label"><div class="top"><span>T-120 · SP</span><span>TAPE 07</span></div>
-  <h1>NOCLIP</h1><div class="hand">level 0. do not rewind.</div>
+  <h1>NOCLIP</h1><div class="hand">${H.playT>60?'it remembers you.':'level 0. do not rewind.'}</div>
   <p>You were carrying a box down the basement stairs. You leaned on the wall and the wall wasn't there. Now it's damp carpet, dead lights and total dark. The camcorder light is the only light there is.</p>
   <p>Someone was here before you. They left five notes on the walls. Find them, and find the way out. Something tall in here is always smiling. It cannot move while your light is on it. Your light does not like it being near.</p>
   <div class="ctrl"><kbd>WASD</kbd>move <kbd>SHIFT</kbd>run <kbd>C</kbd>crouch · look: mouse (click), drag, or <kbd>ARROWS</kbd><br><kbd>E</kbd>read / open <kbd>F</kbd>light on/off <kbd>M</kbd>map · keep the light on it. every flicker, it moves.</div></div>
   <div class="actions"><span class="fine">HEADPHONES. LIGHTS OFF.</span><button type="button" data-go id="goTitle" ${modelReady?'':'disabled'}>${modelReady?'▶ PLAY':'LOADING…'}</button></div></div>`);
   $('goTitle').onclick=()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();newGame()};
 }
-function newGame(){
+function newGame(){H.games++;saveH();
   RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
   placeNotes();AI.first=true;AI.chain=0;spawnPlayer(START.x,START.y);hideMonster(9);startPlay();
   setTimeout(()=>caption('[The hum. The carpet is wet under your shoes.]'),900);
@@ -843,7 +890,7 @@ function showDeath(){
   G.state='dead';
   show(`<div class="tape lost"><div class="label"><div class="top"><span>TRACKING</span><span>${String(G.notes)}/5 NOTES</span></div>
   <h2>SIGNAL LOST</h2><p>The tape keeps running for another forty seconds. Nothing on it but black, and the sound of something wet and very close, breathing through its smile.</p>
-  <p style="color:#8f8b78">It only moves when your light is off it. Each flicker is a step closer. Back away with the beam on it, and check behind you.</p></div>
+  ${habitLines().length?`<p style="color:#c9b45a">IT HAS LEARNED: ${habitLines().join(' · ')}.</p>`:''}<p style="color:#8f8b78">It only moves when your light is off it. Each flicker is a step closer. Back away with the beam on it, and check behind you.</p></div>
   <div class="actions"><span class="fine">YOUR NOTES ARE KEPT</span><button type="button" data-go id="goRetry">◀◀ REWIND</button></div></div>`);
   $('goRetry').onclick=()=>{let b=null,bd=0;for(let t=0;t<80;t++){const x=rnd()*GW|0,y=rnd()*GH|0,d=Math.hypot(x-START.x,y-START.y)+rnd()*3;if(d>bd){bd=d;b=[x,y]}}spawnPlayer(b[0],b[1]);hideMonster(G.exitOpen?6:12);startPlay();caption('[You come to on the carpet. It let you go. For now.]')};
 }
@@ -911,7 +958,7 @@ function updatePlayer(dt){
   const turn=2.2*dt;if(keys.ArrowLeft)player.yaw+=turn;if(keys.ArrowRight)player.yaw-=turn;if(keys.ArrowUp)player.pitch=clamp(player.pitch+turn*.7,-1.35,1.35);if(keys.ArrowDown)player.pitch=clamp(player.pitch-turn*.7,-1.35,1.35);
   const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);let f=0,s=0;if(keys.KeyW)f++;if(keys.KeyS)f--;if(keys.KeyD)s++;if(keys.KeyA)s--;f-=joy.y;s+=joy.x;
   let ix=fx*f-fz*s,iz=fz*f+fx*s;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}
-  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;
+  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;trackHabits(dt,run);player.vx=ix*(run?4.6:2.3);player.vz=iz*(run?4.6:2.3);
   G.stam=clamp(G.stam+(run?-20:11)*dt,0,100);
   const sp=run?4.6:G.crouch?1.3:2.3;
   const p={x:player.x+ix*sp*dt,z:player.z+iz*sp*dt};collide(p,.3);player.x=p.x;player.z=p.z;

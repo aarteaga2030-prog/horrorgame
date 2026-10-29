@@ -25,6 +25,8 @@ It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. Bu
 - Keep the beam on it and back away.
 - It's smart. It uses the flickers to dart behind walls, then circles around to come at you from the side or behind. Listen for it.
 - It switches between walking upright and crawling every few seconds, even while frozen, so each flicker can show it in a new pose.
+- Don't stare too long. Hold the beam on it and the light starts flickering harder. Then it bolts for the nearest cover and comes around another way.
+- It learns your habits: which way you usually turn, whether you check behind you, and how long you stare. Then it comes from your blind side. It remembers you between games (saved in your browser), and the death screen tells you what it has learned.
 - Look away and it comes fast. If it's been out of sight too long, it gets behind you.
 - Turning the light off (F) lets it move freely.
 - Your map (M) shows where you've been, and the exit once all five notes are found.
