@@ -564,7 +564,7 @@ function monsterInView(){if(!MON.visible||!CR)return false;const h=CR.B.head_05.
 function monsterSeen(){if(!MON.visible||!CR)return false;const h=CR.B.head_05.getWorldPosition(new V3()),c=CR.B.chest_03.getWorldPosition(new V3());return canSee(h.x,h.y,h.z)||canSee(c.x,c.y,c.z)}
 const AI={state:'hidden',t:0,next:10,seen:0,unseen:0,chain:0,flag:false,first:true,sub:0,t2:0,spot:null,lastKnown:new V3(),lost:0,path:[],pi:0,field:null,fieldKey:-1,gig:4};
 function aggression(){return clamp(.12+G.notes*.17+G.time/1000,0,1)}
-function setAI(s){AI.state=s;AI.t=0;AI.seen=0;AI.unseen=0;AI.sub=0;AI.t2=0;AI.flag=false}
+function setAI(s){AI.state=s;AI.t=0;AI.seen=0;AI.unseen=0;AI.sub=0;AI.t2=0;AI.flag=false;AI.mode=null;AI.goal=null;AI.wait=0;AI.flanks=0;AI.planT=0}
 function hideMonster(next){MON.visible=false;MON.frozen=false;if(CR)CR.root.visible=false;setAI('hidden');AI.next=next;MON.pos.set(-50,0,-50)}
 function showMonster(){MON.visible=true;if(CR)CR.root.visible=true}
 function navTo(tx,tz,speed,dt){
@@ -707,6 +707,18 @@ function updateAIOld(dt){
 }
 function farCell(){let best=null,bd=0;for(let t=0;t<60;t++){const x=rnd()*GW|0,y=rnd()*GH|0;const cx=(x+.5)*CS,cz=(y+.5)*CS,d=Math.hypot(cx-player.x,cz-player.z);if(d>bd){bd=d;best=new V3(cx,0,cz)}}return best}
 function kill(){if(G.state!=='play')return;G.state='dying';G.scareT=0;setAI('grab');SND.jump();SND.scream();$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
+function findFlank(dmin,dmax,behindPref){
+  const[mx,my]=cellOf(MON.pos.x,MON.pos.z);const f=cellBFS(mx,my);
+  const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
+  const[pcx,pcy]=cellOf(player.x,player.z);const pf=cellBFS(pcx,pcy);
+  let best=null,bs=-1e9;
+  cellsAround(dmin,dmax,(x,y,cx,cz,d)=>{const pd=f[y*GW+x];if(pd<0||pd>12)return;if(pf[y*GW+x]<0||pf[y*GW+x]>8)return;
+    if(losXZ(player.x,player.z,cx,cz))return;
+    const vx=(cx-player.x)/d,vz=(cz-player.z)/d;const behind=(1-(vx*fw.x+vz*fw.z))/2;const ang=Math.atan2(vz,vx);
+    const around=AI.lastAng!=null?Math.abs(angDiff(AI.lastAng,ang))/Math.PI:0;
+    const sc=behind*behindPref*3+around*.8-pd*.22-pf[y*GW+x]*.15+rnd()*.7;
+    if(sc>bs){bs=sc;best={x:cx,z:cz,ang}}});
+  return best}
 function relocateBehind(){
   const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
   for(let t=0;t<50;t++){const a=Math.atan2(fw.x,fw.z)+Math.PI+(rnd()-.5)*1.4,d=4+rnd()*4;const x=player.x+Math.sin(a)*d,z=player.z+Math.cos(a)*d;
@@ -728,7 +740,7 @@ function updateAI(dt){
   const lit=monsterLit(),inV=lit||monsterInView();
   MON.frozen=lit&&AI.state!=='hidden';
   if(lit){AI.seen+=dt;AI.unseen=0}else if(!inV)AI.unseen+=dt;AI.t+=dt;
-  G.flickRate=MON.visible?(dP<15?(1-dP/15)*(1.4+G.notes*.25+(G.exitOpen?1.2:0)):.05):.03;
+  G.flickRate=MON.visible?(dP<15?(1-dP/15)*(1.25+G.notes*.22+(G.exitOpen?1.1:0)):.05):.03;
   if(lit&&!AI.wasLit&&MON.visible){if(AI.moved>.35&&dP<8){SND.sting();G.glitch=.7;if(dP<4)caption(pick(['[It is closer.]','[Don\'t blink.]','[Keep the light on it.]']))}AI.moved=0}
   AI.wasLit=lit;
   const I=INTENT;
@@ -745,17 +757,39 @@ function updateAI(dt){
     if(AI.flag&&AI.t2>=1&&(G.flickOff>0||!G.light)){AI.style=rnd()<.4+a*.3?'crawl':'walk';setAI('stalk');AI.flag=true;AI.hold=0}
     if(AI.t>22)hideMonster(5);break}
   case 'stalk':{
+    // gait switching: alternate between upright walk and crawl every few seconds
+    AI.styleT=(AI.styleT==null?2:AI.styleT)-dt;
+    if(AI.styleT<=0){const want=AI.mode==='flank'?(rnd()<.7?'crawl':'walk'):(rnd()<.45?'crawl':'walk');if(want!==AI.style){AI.style=want;if(MON.visible&&dP<12)SND.click()}AI.styleT=(lit?.8:1.4)+rnd()*2.6}
+    const flick=G.light&&G.flickOff>0;
+    // planning
+    AI.planT=(AI.planT||0)-dt;const atGoalX=AI.goal&&Math.hypot(AI.goal.x-MON.pos.x,AI.goal.z-MON.pos.z)<.7,atGoal=atGoalX;
+    const goalBad=AI.goal&&losXZ(player.x,player.z,AI.goal.x,AI.goal.z);
+    if(AI.planT<=0||atGoal||(AI.mode==='flank'&&goalBad)||!AI.mode){
+      AI.planT=lit?.5+rnd()*.8:1.2+rnd()*1.6;
+      if(atGoal&&AI.mode==='flank'){AI.wait=.25+rnd()*.9;AI.flanks=(AI.flanks||0)+1}
+      let f=null;
+      if(inV&&dP>3&&rnd()<.6+a*.25)f=findFlank(Math.max(2.5,dP*.45),Math.min(14,dP+3),.6);
+      else if(!inV&&dP>3.5&&(AI.flanks||0)<3&&rnd()<.65)f=findFlank(Math.max(2.5,dP-4),Math.max(4,dP-1),1.6);
+      if(f){AI.mode='flank';AI.goal=f;AI.lastAng=f.ang;if(AI.style!=='crawl'&&rnd()<.6){AI.style='crawl';AI.styleT=1.5+rnd()*2}}
+      else{AI.mode='approach';AI.goal=null;if(!inV)AI.flanks=0}
+    }
     if(lit){MON.vel.set(0,0,0);MON.speed=0;break}
-    resetIntent();I.look.copy(camera.position);
     const crawl=G.exitOpen||AI.style==='crawl';
+    resetIntent();I.look.copy(camera.position);
     I.stand=crawl?0:1;I.hunch=.5;I.limp=!crawl;I.jaw=dP<5?1:.45;I.armsUp=!crawl&&dP<5?clamp((5.5-dP)/3,0,1):0;I.tilt=.35+Math.sin(AI.t*.9)*.45;
     if(AI.hold>0){AI.hold-=dt;stopMove(dt);faceTo(player.x,player.z,dt,1);break}
-    let sp;if(inV)sp=(G.light&&G.flickOff>0)?(crawl?5:4.2):2.6;else sp=(crawl?3.8:2.1)+a*.9+(G.exitOpen?.8:0);
-    navTo(player.x,player.z,sp,dt);AI.moved+=MON.speed*dt;
+    if(AI.wait>0&&!flick){AI.wait-=dt;stopMove(dt);faceTo(player.x,player.z,dt,2);I.tilt=.9;break}
+    let sp;
+    if(flick)sp=crawl?9:7.2;
+    else if(inV)sp=crawl?3.6:2.8;
+    else sp=(crawl?4.3:2.5)+a*.9+(G.exitOpen?.8:0);
+    if(AI.mode==='flank'&&AI.goal)navTo(AI.goal.x,AI.goal.z,sp,dt);else navTo(player.x,player.z,sp,dt);
+    if(AI.mode==='flank'&&!inV&&!losXZ(MON.pos.x,MON.pos.z,player.x,player.z)&&MON.speed>2&&rnd()<dt*1.5)SND.slap(.5);
+    AI.moved+=MON.speed*dt;
     if(dP<.95){kill();break}
-    if(!inV&&AI.unseen>Math.max(9,22-G.notes*2.5)&&dP>7&&rnd()<dt*.5)relocateBehind();
+    if(!inV&&AI.unseen>Math.max(9,22-G.notes*2.5)&&dP>7&&rnd()<dt*.5){relocateBehind();AI.mode=null}
     AI.gig-=dt;if(AI.gig<=0){AI.gig=3+rnd()*5;if(rnd()<.5)SND.click();else SND.creak()}
-    if(!G.exitOpen&&AI.t>60&&!inV&&dP>10)hideMonster(8+rnd()*8);
+    if(!G.exitOpen&&AI.t>70&&!inV&&dP>10)hideMonster(8+rnd()*8);
     break}
   }
   if(AC){const near=MON.visible?clamp(1-dP/10,0,1):0;breathG.gain.setTargetAtTime(MON.visible&&!lit?(.04+near*.3):0,AC.currentTime,.15);
@@ -967,7 +1001,7 @@ if(DEBUG)window.__dbg=function(mode,secs){
   composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85);
 };
 function initAudioStub(){}
-if(DEBUG){window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
+if(DEBUG){window.__los=losXZ;window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
   window.__force=(ev)=>{const f={stare:()=>spawnStare(10,22,false)||spawnStare(10,22,true),peek:spawnPeek,cross:spawnCross,behind:spawnBehind}[ev];return f?f():false};
   window.__shot=()=>{composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85)};
   window.__lookAtMon=()=>{const dx=MON.pos.x-player.x,dz=MON.pos.z-player.z;player.yaw=Math.atan2(-dx,-dz);player.pitch=-.05}}
