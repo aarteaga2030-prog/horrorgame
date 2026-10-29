@@ -47,6 +47,10 @@ Press M for Wanderer 7's pencil map. The game keeps running while you read it. I
 
 Your view whips around to face it. It rises, tilts its head and closes its hands around your face. It snaps forward, you drop to your knees, then hit the floor with it hanging over you, and the light dies.
 
+## The ending
+
+Open the EXIT door and a short film plays. You stumble out into a rainy parking lot under one orange street lamp as the door swings shut behind you. Then it's three weeks later: the tape rewinds and plays back the last seconds, filmed from the camcorder hanging at your side. A long pale hand slides out and stops the door from closing. Pause. One frame forward. It's in the doorway, smiling at the camera. Press E or tap to skip.
+
 ## Controls
 
 | Action | Keys |
