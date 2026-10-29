@@ -18,19 +18,34 @@ It uses `smily_horror_monster.glb`, scaled to stand 6 feet tall. Every movement 
 
 ## The rule
 
-It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. But your flashlight flickers when it's close, and in every dark flicker it lurches toward you. The closer it gets, the more the light flickers.
+It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. But your flashlight flickers when it's close or when you stare too long, and in every dark flicker it moves.
 
-## How to survive
+## How it thinks
 
-- Keep the beam on it and back away.
-- It's smart. It uses the flickers to dart behind walls, then circles around to come at you from the side or behind. Listen for it.
-- It switches between walking upright and crawling every few seconds, even while frozen, so each flicker can show it in a new pose.
-- Don't stare too long. Hold the beam on it and the light starts flickering harder. Then it bolts for the nearest cover and comes around another way.
-- It learns your habits: which way you usually turn, whether you check behind you, and how long you stare. Then it comes from your blind side. It remembers you between games (saved in your browser), and the death screen tells you what it has learned.
-- Look away and it comes fast. If it's been out of sight too long, it gets behind you.
-- Turning the light off (F) lets it move freely.
-- Your map (M) shows where you've been, and the exit once all five notes are found.
-- If it catches you, rewind the tape. You keep your notes.
+It's always somewhere in the maze. Nothing teleports. It builds a belief about where you are:
+
+- **Sight:** your flashlight gives you away to anything with line of sight. In the dark it only sees you up close.
+- **Sound:** running is loud, walking is quieter, crouching is nearly silent.
+- **Memory:** it learns your habits (turn direction, whether you check behind you, how long you stare, whether you hide in the dark) and saves them in your browser.
+
+Several times a second it scores its options and commits to the best one:
+
+- **Search:** walks upright, head sweeping, checking the places you spend the most time.
+- **Hunt:** heads for where you're going, not just where you are, and creeps slowly for the last few meters.
+- **Flank:** slips behind walls and circles to your blind side.
+- **Ambush:** reads which way you're walking, waits at a corner ahead of you, and peeks out.
+- **Lurk:** stands perfectly still in the dark at the edge of your view for you to find.
+- **Back off:** if it has been on top of you too long, it retreats for a while, then comes back.
+
+Stare at it too long and it forces a burst of flickers and bolts for the nearest cover.
+
+## The map
+
+Press M for Wanderer 7's pencil map. The game keeps running while you read it. It shows the walls you've seen, your trail, every spot where you saw the monster (with how long ago), and a circle where the next note probably is.
+
+## When it catches you
+
+Your view whips around to face it. It rises, tilts its head and closes its hands around your face. It snaps forward, you drop to your knees, then hit the floor with it hanging over you, and the light dies.
 
 ## Controls
 
@@ -40,7 +55,7 @@ It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. Bu
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
 | Read a note / open the door | E |
 | Flashlight on/off | F |
-| Map | M |
+| Map (game keeps running) | M |
 
 ## Play
 

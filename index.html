@@ -61,9 +61,14 @@ button:focus-visible{outline:2px solid var(--mustard);outline-offset:3px}
 .note .who{font-family:var(--f-osd);font-size:18px;color:#7a7466;margin-bottom:6px;letter-spacing:.1em}
 .note .body{font-family:var(--f-hand);font-size:27px;line-height:1.2;margin:0 0 16px}
 .note button{font-family:var(--f-osd);font-size:22px;background:#2a2a36;color:var(--paper);border:0;padding:6px 16px;cursor:pointer}
-#mapWrap .panel{background:rgba(10,9,6,.92);border:2px solid var(--osd);padding:12px;display:grid;gap:8px;justify-items:center}
-#mapWrap canvas{display:block;width:min(78vmin,560px);height:auto;aspect-ratio:1/1;image-rendering:pixelated}
-#mapWrap .cap{font-family:var(--f-osd);font-size:20px;color:var(--osd)}
+#mapWrap{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));top:calc(64px + env(safe-area-inset-top,0px));z-index:15;pointer-events:none;width:min(44vw,440px,calc(100vh - 230px))}
+#mapWrap .panel{background:#e4dcc3;background-image:linear-gradient(rgba(70,110,170,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(70,110,170,.18) 1px,transparent 1px);background-size:14px 14px;color:#2b2a30;padding:10px 12px 8px;transform:rotate(-1.2deg);box-shadow:0 18px 50px rgba(0,0,0,.85);display:grid;gap:6px}
+#mapWrap .mtitle{display:flex;justify-content:space-between;font-family:var(--f-hand);font-size:22px;line-height:1;color:#2b3a7a;border-bottom:2px solid #b8372d;padding-bottom:4px}
+#mapWrap canvas{display:block;width:100%;height:auto;aspect-ratio:1/1}
+#mapWrap .cap{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--f-hand);font-size:19px;line-height:1}
+#mapWrap .k.you{color:#2b3a7a}#mapWrap .k.seen{color:#a8281d}#mapWrap .k.hint{color:#7a4a10}#mapWrap .k.note{color:#2b2a30}
+#mapWrap .cap2{font-family:var(--f-osd);font-size:15px;color:#6b6655;letter-spacing:.06em}
+@media (max-width:700px){#mapWrap{width:min(62vw,calc(100vh - 240px))}}
 #touch .joy{position:fixed;left:calc(22px + env(safe-area-inset-left,0px));bottom:calc(70px + env(safe-area-inset-bottom,0px));width:124px;height:124px;border-radius:50%;border:2px solid rgba(236,235,223,.3);background:rgba(0,0,0,.25);touch-action:none}
 #touch .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px;border-radius:50%;background:rgba(236,235,223,.28)}
 #touch .btns{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,74px);gap:10px}
@@ -100,7 +105,7 @@ button:focus-visible{outline:2px solid var(--mustard);outline-offset:3px}
 </div>
 <div id="screen" class="overlay"></div>
 <div id="noteWrap" class="overlay" hidden></div>
-<div id="mapWrap" class="overlay" hidden><div class="panel"><canvas id="mapCv" width="520" height="520"></canvas><div class="cap">WHERE YOU HAVE BEEN · M TO CLOSE</div></div></div>
+<div id="mapWrap" hidden><div class="panel"><div class="mtitle"><span>WANDERER 7'S MAP</span><span>LEVEL 0</span></div><canvas id="mapCv" width="560" height="560"></canvas><div class="cap"><span class="k you">▲ you</span><span class="k seen">✕ saw it</span><span class="k hint">◌ note?</span><span class="k note">■ found</span></div><div class="cap2">THE GAME DOES NOT STOP WHILE YOU READ · M</div></div></div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -512,7 +517,7 @@ function addNoteSound(n){if(!AC)return;const s=noiseSrc();const f=AC.createBiqua
   const p=mkPanner(1.2,1.6);setPos(p,n.pos.x,1.4,n.pos.z);s.connect(f);f.connect(g);g.connect(p);p.connect(master);n.snd={s,g,lfo}}
 
 /* ============ GAME STATE ============ */
-const G={state:'loading',time:0,paused:false,notes:0,exitOpen:false,power:1,boT:0,boCool:40,stam:100,light:true,lightNow:true,flickOff:0,flickRate:0,crouch:false,caps:[],explored:null,shake:0,glitch:0,scareT:0,noise:0,heartT:0,exploreT:0};
+const G={trail:[],sights:[],heat:null,hintIdx:-1,killLight:true,state:'loading',time:0,paused:false,notes:0,exitOpen:false,power:1,boT:0,boCool:40,stam:100,light:true,lightNow:true,flickOff:0,flickRate:0,crouch:false,caps:[],explored:null,shake:0,glitch:0,scareT:0,noise:0,heartT:0,exploreT:0};
 const player={x:0,z:0,yaw:0,pitch:0,ang:0,walk:0,y:EYE,stepT:0};
 const NOTES_TXT=[
   'The lights died on day three. Only my torch now. There is something in here with me. It stands at the far end of the halls and does not move. It is tall. It is smiling.',
@@ -529,8 +534,10 @@ function placeNotes(){
     const walls=D4.filter(([dx,dy])=>!edgeOpen(x,y,dx,dy)&&inCell(x+dx,y+dy)||!inCell(x+dx,y+dy));if(!walls.length)continue;chosen.push({x,y,w:pick(walls)})}
   chosen.forEach((c,i)=>{const[dx,dy]=c.w;const cx=(c.x+.5)*CS,cz=(c.y+.5)*CS;const off=CS/2-WT/2-.012;
     const pos=new V3(cx+dx*off,1.45,cz+dy*off);const m=new THREE.Mesh(new THREE.PlaneGeometry(.21,.28),new THREE.MeshStandardMaterial({map:noteTex,roughness:.9,emissive:0xfff2d0,emissiveMap:noteTex,emissiveIntensity:.22}));
-    m.position.copy(pos);m.lookAt(cx,1.45,cz);m.rotateZ((rnd()-.5)*.2);levelGroup.add(m);const n={pos,mesh:m,taken:false,idx:i};notes.push(n);addNoteSound(n)});
+    m.position.copy(pos);m.lookAt(cx,1.45,cz);m.rotateZ((rnd()-.5)*.2);levelGroup.add(m);const n={pos,mesh:m,taken:false,idx:i,hint:{x:pos.x+(rnd()-.5)*CS*2.2,z:pos.z+(rnd()-.5)*CS*2.2}};notes.push(n);addNoteSound(n)});
+  G.hintIdx=nearestNote((START.x+.5)*CS,(START.y+.5)*CS);
 }
+function nearestNote(x,z){let b=-1,bd=1e9;notes.forEach((n,i)=>{if(n.taken)return;const d=Math.hypot(n.pos.x-x,n.pos.z-z);if(d<bd){bd=d;b=i}});return b}
 function openExit(){
   let best=null,bd=0;
   for(let t=0;t<3000;t++){const x=rnd()*GW|0,y=rnd()*GH|0;const d=Math.hypot((x+.5)*CS-player.x,(y+.5)*CS-player.z);if(d<30||d<bd)continue;
@@ -560,7 +567,7 @@ function trackHabits(dt,run){
   prevYaw=player.yaw;saveT-=dt;if(saveT<=0){saveT=5;saveH()}
 }
 function habits(){const tt=H.turnL+H.turnR;const mins=Math.max(.5,H.playT/60);
-  return{leftBias:tt>25?(H.turnL-H.turnR)/tt:0,behindRate:H.behind/mins,stare:H.stareN>=3?H.stareSum/H.stareN:2.6,runFrac:H.runT/Math.max(1,H.playT),known:H.playT>45}}
+  return{lightOffFrac:H.lightOffT/Math.max(1,H.playT),leftBias:tt>25?(H.turnL-H.turnR)/tt:0,behindRate:H.behind/mins,stare:H.stareN>=3?H.stareSum/H.stareN:2.6,runFrac:H.runT/Math.max(1,H.playT),known:H.playT>45}}
 function playerLeft(){return new V3(-Math.cos(player.yaw),0,Math.sin(player.yaw))}
 function playerFwd(){return new V3(-Math.sin(player.yaw),0,-Math.cos(player.yaw))}
 // score bonus for approaching from the side the player checks least, and from behind if they rarely look back
@@ -571,6 +578,7 @@ function habitLines(){const hb=habits(),out=[];
   if(hb.behindRate<1.2)out.push('you almost never look behind you');else if(hb.behindRate>4)out.push('you check behind you, so it comes from the side');
   if(H.stareN>=3)out.push(`you hold the light on it for about ${hb.stare.toFixed(1)} seconds`);
   if(hb.runFrac>.35)out.push('you run a lot, and it can hear you');
+  if(hb.lightOffFrac>.15)out.push('you hide in the dark, so it listens harder');
   return out}
 function maybeTell(){const hb=habits();
   if(!told.turn&&Math.abs(hb.leftBias)>.3&&H.turnL+H.turnR>40){told.turn=1;caption(`[It has noticed you always turn ${hb.leftBias>0?'left':'right'}.]`);return}
@@ -625,7 +633,7 @@ function spawnStare(dmin,dmax,inView){
   const c=[];cellsAround(dmin,dmax,(x,y,cx,cz,d)=>{if(!losXZ(player.x,player.z,cx,cz))return;const vd=viewDot(cx,cz);if(inView?vd<.8:vd>.55)return;if(beamLit(cx,1.2,cz))return;c.push({cx,cz,d,s:d+rnd()*4})});
   if(!c.length)return false;c.sort((a,b)=>b.s-a.s);const s=c[Math.floor(rnd()*Math.min(4,c.length))];
   resetIntent();placeMonster(s.cx,s.cz,Math.atan2(player.x-s.cx,player.z-s.cz),1);showMonster();setAI('stare');return true}
-function findPeek(dmin,dmax){
+function findPeek(dmin,dmax,all){
   const out=[];const[pcx,pcy]=cellOf(player.x,player.z);const R=Math.ceil(dmax/CS)+1;const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
   for(let j=pcy-R;j<=pcy+R+1;j++)for(let i=pcx-R;i<=pcx+R+1;i++){if(i<0||j<0||i>GW||j>GH)continue;const ve=vertexEdges(i,j);const C=new V3(i*CS,0,j*CS);
     for(let k=0;k<4;k++){if(!ve[k])continue;const opp=k^1;if(ve[opp])continue;const w=new V3(dirs[k][0],0,dirs[k][1]);
@@ -636,7 +644,7 @@ function findPeek(dmin,dmax){
         if(losXZ(player.x,player.z,M.x,M.z))continue;if(!losXZ(player.x,player.z,H.x,H.z))continue;if(!losXZ(M.x,M.z,H.x+w.x*-.1,H.z+w.z*-.1))continue;
         if(nearestWall(M.x,M.z).d<.25)continue;
         out.push({C,w,n,M,H,d,s:viewDot(H.x,H.z)+rnd()*.5})}}}
-  if(!out.length)return null;out.sort((a,b)=>b.s-a.s);return out[Math.floor(rnd()*Math.min(3,out.length))];
+  if(all)return out;if(!out.length)return null;out.sort((a,b)=>b.s-a.s);return out[Math.floor(rnd()*Math.min(3,out.length))];
 }
 function spawnPeek(){const s=findPeek(5,15);if(!s)return false;AI.spot=s;
   const fwd=s.w.clone().multiplyScalar(-1);const yaw=Math.atan2(fwd.x,fwd.z);const lf=leftOf(yaw);s.side=lf.dot(s.n)<0?1:-1;// lean toward -n
@@ -737,7 +745,7 @@ function updateAIOld(dt){
   if(MON.visible&&dP<6&&rnd()<dt*1.2)flickerNear();
 }
 function farCell(){let best=null,bd=0;for(let t=0;t<60;t++){const x=rnd()*GW|0,y=rnd()*GH|0;const cx=(x+.5)*CS,cz=(y+.5)*CS,d=Math.hypot(cx-player.x,cz-player.z);if(d>bd){bd=d;best=new V3(cx,0,cz)}}return best}
-function kill(){if(G.state!=='play')return;saveH();G.state='dying';G.scareT=0;setAI('grab');SND.jump();SND.scream();$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
+function kill(){if(G.state!=='play')return;saveH();beginKill();G.state='dying';G.scareT=0;setAI('grab');$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
 function findFlank(dmin,dmax,behindPref){
   const[mx,my]=cellOf(MON.pos.x,MON.pos.z);const f=cellBFS(mx,my);
   const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
@@ -773,7 +781,7 @@ function startEvent(){
     else if(e==='peek')ok=spawnPeek();else if(e==='behind')ok=spawnBehind();
     if(ok){AI.first=false;AI.moved=0;return}}
   AI.next=3}
-function updateAI(dt){
+function updateAIStalk(dt){
   if(!CR)return;
   const dP=Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z),a=aggression();
   const lit=monsterLit(),inV=lit||monsterInView();
@@ -842,13 +850,182 @@ function updateAI(dt){
     tensG.gain.setTargetAtTime(MON.visible&&inV?.03+near*.05:0,AC.currentTime,.5)}
   if(MON.visible&&dP<9){G.heartT-=dt;if(G.heartT<=0){G.heartT=Math.max(.3,dP*.11);SND.heart(.12+.3*(1-dP/9))}}
 }
-function updateGrab(dt){
-  const I=INTENT;resetIntent();const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();const rt=new V3().crossVectors(fw,UP).normalize();
-  const t=G.scareT;const d=lerp(1.3,.72,clamp(t*3,0,1));MON.pos.set(camera.position.x+fw.x*d,0,camera.position.z+fw.z*d);MON.yaw=Math.atan2(-fw.x,-fw.z);MON.vel.set(0,0,0);MON.speed=0;
-  I.stand=1;I.hunch=.15;I.leanF=.25;I.jaw=1;I.tilt=Math.sin(t*30)*.35;I.look.copy(camera.position);I.choppy=t>.5;I.noDrag=true;I.limp=false;
-  for(let h=0;h<2;h++){const s=h?-1:1;I.grip[h]=camera.position.clone().addScaledVector(rt,s*-.26).addScaledVector(fw,.12).add(new V3(0,-.08,0));I.gripDir[h]=rt.clone().multiplyScalar(s).addScaledVector(fw,-.4).normalize();I.curl[h]=.6}
+const K={cam:null};
+function beginKill(){K.yaw0=player.yaw;K.pitch0=player.pitch;K.y0=player.y;const dx=MON.pos.x-player.x,dz=MON.pos.z-player.z;K.faceYaw=Math.atan2(-dx,-dz);K.x=player.x;K.z=player.z;K.side=rnd()<.5?1:-1;K.snd=0;A.stand.snap(Math.max(A.stand.x,.75));K.cam={x:K.x,y:K.y0,z:K.z,yaw:K.yaw0,pitch:K.pitch0,roll:0}}
+/* ============ BRAIN: belief + utility AI ============
+   It always exists in the maze. It believes it knows where you are from what it can see (your flashlight gives you away),
+   what it can hear (running, walking) and the habits it has learned. Every few tenths of a second it scores its options
+   (search, hunt, flank, ambush, lurk, retreat) and commits to the best one, with hysteresis so it doesn't dither.
+   It still cannot move while your beam is on it; it plans while frozen and acts in the flickers. */
+const BR={x:0,z:0,vx:0,vz:0,conf:0,t:-99};
+const BRAIN={action:null,goal:null,think:0,actT:0,menace:0,backoffT:0,lurkCool:25,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,unseenT:0,lostSaid:false,visited:null,seenAtLurk:0};
+function brainReset(grace){
+  const[pcx,pcy]=cellOf(player.x,player.z);const f=cellBFS(pcx,pcy);let maxd=0;for(let i=0;i<GW*GH;i++)if(f[i]>maxd)maxd=f[i];
+  const far=[];for(let i=0;i<GW*GH;i++)if(f[i]>=Math.max(9,maxd*.6))far.push(i);const c=far.length?pick(far):0;
+  resetIntent();placeMonster((c%GW+.5)*CS,((c/GW|0)+.5)*CS,rnd()*6.28,1);showMonster();setAI('brain');
+  Object.assign(BRAIN,{action:null,goal:null,think:0,actT:0,menace:0,backoffT:grace||0,lurkCool:12,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,lostSaid:false,seenAtLurk:0});
+  BRAIN.visited=new Float32Array(GW*GH).fill(-99);
+  BR.x=player.x+(rnd()-.5)*CS*6;BR.z=player.z+(rnd()-.5)*CS*6;BR.vx=BR.vz=0;BR.conf=.3;BR.t=G.time;AI.style='walk';AI.styleT=3;AI.dash=false;
 }
-
+function sense(dt,dP){
+  const hb=habits(),los=losXZ(MON.pos.x,MON.pos.z,player.x,player.z);
+  const sees=los&&((G.light&&dP<34)||dP<4.5);
+  const hears=G.noise>0&&dP<G.noise*(1+hb.lightOffFrac*.8)*(los?1:.75);
+  const prev=BR.conf;
+  if(sees||hears||G.exitOpen){BR.x=player.x;BR.z=player.z;BR.vx=player.vx||0;BR.vz=player.vz||0;BR.conf=(sees||G.exitOpen)?1:Math.max(BR.conf,.75);BR.t=G.time;
+    if(sees&&G.light&&!told.light&&dP<20&&G.time>20){told.light=1;caption('[It can see your light. It knows where you are.]')}}
+  else{BR.conf=Math.max(0,BR.conf-dt*.07);
+    if(G.time-BR.t>12+rnd()*6&&BR.conf<.3){BR.x=player.x+(rnd()-.5)*CS*4;BR.z=player.z+(rnd()-.5)*CS*4;BR.vx=BR.vz=0;BR.conf=.35;BR.t=G.time}}
+  if(prev>.6&&BR.conf<=.3&&!BRAIN.lostSaid&&dP<18){BRAIN.lostSaid=true;caption('[It has lost you. It is listening.]')}
+  if(BR.conf>.9)BRAIN.lostSaid=false;
+}
+function mcellField(){const[mx,my]=cellOf(MON.pos.x,MON.pos.z);return cellBFS(mx,my)}
+function searchGoal(){
+  const age=G.time-BR.t,r=clamp(2+age*.12,2,9);const[bx,by]=cellOf(BR.x,BR.z);const f=mcellField();let best=null,bs=-1e9;
+  for(let y=Math.floor(by-r);y<=by+r;y++)for(let x=Math.floor(bx-r);x<=bx+r;x++){if(!inCell(x,y))continue;const i=y*GW+x;if(f[i]<0)continue;const dd=Math.hypot(x-bx,y-by);if(dd>r)continue;
+    const sc=Math.min(2.5,(G.heat?G.heat[i]:0)*.08)-dd*.22-(G.time-BRAIN.visited[i]<45?2.2:0)-f[i]*.04+rnd()*1.2;if(sc>bs){bs=sc;best={x:(x+.5)*CS,z:(y+.5)*CS,cell:i}}}
+  return best||{x:BR.x,z:BR.z,cell:-1}}
+function findAmbush(){
+  const L=findPeek(4,13,true);if(!L||!L.length)return null;const f=mcellField();const vx=player.vx||0,vz=player.vz||0,sp=Math.hypot(vx,vz)||1;let best=null,bs=-1e9;
+  for(const s of L){const c=cellOf(s.M.x,s.M.z),pd=f[c[1]*GW+c[0]];if(pd<0||pd>12)continue;const ahead=((s.H.x-player.x)*vx+(s.H.z-player.z)*vz)/(sp*s.d);
+    const sc=ahead*1.5+blindBonus((s.H.x-player.x)/s.d,(s.H.z-player.z)/s.d)*.4-pd*.15+rnd()*.5;if(sc>bs){bs=sc;best=s}}
+  if(best){const fwd=best.w.clone().multiplyScalar(-1);best.side=leftOf(Math.atan2(fwd.x,fwd.z)).dot(best.n)<0?1:-1}return best}
+function findLurk(){const f=mcellField();const c=[];
+  cellsAround(8,17,(x,y,cx,cz,d)=>{const pd=f[y*GW+x];if(pd<0||pd>12)return;if(!losXZ(player.x,player.z,cx,cz))return;const vd=viewDot(cx,cz);if(vd<.15||vd>.86)return;c.push({x:cx,z:cz})});
+  return c.length?pick(c):null}
+function retreatGoal(){const f=mcellField();const[pcx,pcy]=cellOf(player.x,player.z);const pf=cellBFS(pcx,pcy);let best=null,bs=-1e9;
+  for(let i=0;i<GW*GH;i++){if(f[i]<0||f[i]>10)continue;const cx=(i%GW+.5)*CS,cz=((i/GW|0)+.5)*CS;if(losXZ(player.x,player.z,cx,cz))continue;const sc=pf[i]-f[i]*.3+rnd()*2;if(sc>bs){bs=sc;best={x:cx,z:cz}}}
+  return best||farCell()}
+function prefStyle(st,p){AI.style=rnd()<p?st:(st==='walk'?'crawl':'walk');AI.styleT=1.5+rnd()*3}
+function startAction(act,dP){
+  BRAIN.action=act;BRAIN.actT=0;BRAIN.arrived=false;BRAIN.waitT=0;BRAIN.goal=null;BRAIN.peek=null;BRAIN.peekP=0;BRAIN.seenAtLurk=0;AI.spot=null;
+  if(act==='search'){BRAIN.goal=searchGoal();prefStyle('walk',.75)}
+  else if(act==='hunt'){prefStyle('crawl',.6)}
+  else if(act==='flank'){const f=findFlank(Math.max(2.5,dP*.4),Math.min(14,dP+3),1);if(f){BRAIN.goal=f;AI.lastAng=f.ang;prefStyle('crawl',.7)}else{BRAIN.action='hunt'}}
+  else if(act==='ambush'){const sp=findAmbush();if(sp){BRAIN.peek=sp;BRAIN.goal={x:sp.M.x,z:sp.M.z};prefStyle('crawl',.8)}else BRAIN.action='hunt'}
+  else if(act==='lurk'){const g=findLurk();if(g){BRAIN.goal=g;AI.style='walk';BRAIN.lurkCool=45+rnd()*30}else{BRAIN.action='search';BRAIN.goal=searchGoal()}}
+  else if(act==='retreat'){BRAIN.goal=retreatGoal();prefStyle('crawl',.8)}
+}
+function think(dP,lit,inV){
+  const a=aggression(),hb=habits(),conf=BR.conf,pv=Math.hypot(player.vx||0,player.vz||0),o={};
+  if(BRAIN.backoffT>0&&!G.exitOpen)o.retreat=3;
+  else{
+    const n=()=>rnd()*.18;
+    o.search=.55-conf*.5+n();
+    if(conf>.35)o.hunt=.26+conf*.24+(dP<7?.3:0)+a*.1+n();
+    if(conf>.4&&dP>4.5&&dP<22)o.flank=.3+(inV?.3:0)+(lit?.3:0)+(hb.behindRate<1.2?.08:0)+n();
+    if(conf>.6&&pv>.7&&dP>6&&!inV)o.ambush=.56+a*.1+n();
+    if(conf>.6&&dP>8&&dP<18&&!inV&&G.light&&BRAIN.lurkCool<=0&&!G.exitOpen)o.lurk=.66+n();
+    if(G.exitOpen){delete o.search;o.hunt=(o.hunt||.5)+.3}}
+  let best=null,bv=-1;for(const k in o)if(o[k]>bv){bv=o[k];best=k}
+  const cur=BRAIN.action;
+  const busy=(cur==='ambush'&&BRAIN.arrived&&BRAIN.actT<16)||(cur==='lurk'&&BRAIN.actT<25)||(cur==='retreat'&&BRAIN.backoffT>0);
+  if(cur&&o[cur]!==undefined&&(busy||(o[cur]+.15>=bv&&BRAIN.actT<9)))best=cur;
+  if(best!==cur||(!BRAIN.goal&&best!=='hunt'))startAction(best,dP);
+}
+function updateAI(dt){
+  if(!CR||AI.state==='grab')return;
+  const dP=Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z),a=aggression();
+  const lit=monsterLit(),inV=lit||monsterInView();MON.frozen=lit;
+  // stare + flicker bookkeeping
+  AI.litStreak=lit?(AI.litStreak||0)+dt:Math.max(0,(AI.litStreak||0)-dt*.5);
+  if(inV){AI.watchT=(AI.watchT||0)+dt;AI.watchGap=0}else{AI.watchGap=(AI.watchGap||0)+dt;if(AI.watchGap>.5&&AI.watchT>.4){H.stareSum+=Math.min(15,AI.watchT);H.stareN++;AI.watchT=0}else if(AI.watchGap>.5)AI.watchT=0}
+  G.flickRate=(dP<15?(1-dP/15)*(1.25+G.notes*.22+(G.exitOpen?1.1:0)):.05)+(lit?Math.min(2.2,.35+AI.litStreak*.55):0);
+  if(lit&&!AI.wasLit){if(AI.moved>.35&&dP<8){SND.sting();G.glitch=.7;if(dP<4)caption(pick(['[It is closer.]','[Don\'t blink.]','[Keep the light on it.]']))}AI.moved=0}
+  AI.wasLit=lit;
+  if(lit&&!BRAIN.sightRec){BRAIN.sightRec=true;G.sights.push({x:MON.pos.x,z:MON.pos.z,t:G.time});if(G.sights.length>10)G.sights.shift()}
+  if(!inV){BRAIN.unseenT+=dt;if(BRAIN.unseenT>3)BRAIN.sightRec=false}else BRAIN.unseenT=0;
+  AI.tellT=(AI.tellT||20)-dt;if(AI.tellT<=0){AI.tellT=25;maybeTell()}
+  sense(dt,dP);
+  // director: if it has been on top of you too long, it backs off for a while
+  BRAIN.menace=clamp(BRAIN.menace+dt*(dP<10?(inV?.06:.025)*(1.5-dP/10):-.05),0,1);
+  BRAIN.backoffT-=dt;BRAIN.lurkCool-=dt;
+  if(BRAIN.menace>.92&&BRAIN.backoffT<=0&&!G.exitOpen){BRAIN.backoffT=7+rnd()*7;BRAIN.menace=.45;BRAIN.think=0}
+  BRAIN.actT+=dt;BRAIN.think-=dt;if(BRAIN.think<=0){BRAIN.think=lit?.25:.4;think(dP,lit,inV)}
+  // stared at too long: burst of flickers and a dash to cover
+  const flick=G.light&&G.flickOff>0;const stareLimit=clamp(habits().stare*.55,.7,2.2);
+  if(lit&&AI.litStreak>stareLimit&&!AI.dash){const c=findCoverNear();AI.dash=true;if(c){BRAIN.action='flank';BRAIN.goal=c;BRAIN.actT=0;BRAIN.arrived=false;AI.lastAng=c.ang;if(rnd()<.6)AI.style='crawl';forceFlicks(3+(rnd()*2|0))}else forceFlicks(2)}
+  if(AI.dash&&!lit&&!inV){AI.dash=false;AI.litStreak=0}
+  AI.styleT=(AI.styleT==null?2:AI.styleT)-dt;if(AI.styleT<=0&&!(BRAIN.arrived&&(BRAIN.action==='ambush'||BRAIN.action==='lurk'))){AI.style=AI.style==='walk'?'crawl':'walk';AI.styleT=1.6+rnd()*3.4;if(dP<12&&rnd()<.5)SND.click()}
+  brainAudio(dP,lit,inV);
+  if(lit){MON.vel.set(0,0,0);MON.speed=0;return}
+  // ---- act
+  const I=INTENT;resetIntent();I.look.copy(camera.position);
+  const act=BRAIN.action||'search',crawl=G.exitOpen||AI.style==='crawl';
+  I.stand=crawl?0:1;I.hunch=.5;I.limp=!crawl;I.jaw=dP<5?1:.4;I.armsUp=!crawl&&dP<5?clamp((5.5-dP)/3,0,1):0;I.tilt=.35+Math.sin(AI.t*.9)*.45;AI.t+=dt;
+  let tx=player.x,tz=player.z,sp;
+  if(act==='hunt'){const lead=dP>3?Math.min(1.2,dP/6):0;tx=BR.x+BR.vx*lead;tz=BR.z+BR.vz*lead;if(!losXZ(BR.x,BR.z,tx,tz)){tx=BR.x;tz=BR.z}sp=crawl?4.1:2.5}
+  else if(BRAIN.goal){tx=BRAIN.goal.x;tz=BRAIN.goal.z;sp=act==='search'?(crawl?2.6:1.35):act==='retreat'?(crawl?4.6:2.7):(crawl?4.3:2.6)}
+  else sp=1.5;
+  sp+=a*.6+(G.exitOpen?.8:0);
+  if(inV&&!flick)sp=Math.min(sp,crawl?3.4:2.6);
+  if(flick)sp=AI.dash?(crawl?11:9):(crawl?9:7.2);
+  else if(!inV&&act==='hunt'&&dP<6&&dP>1.6)sp=Math.min(sp,1.3+dP*.42);
+  if(dP<1.6&&!inV)sp=5.5;
+  const dGoal=Math.hypot(tx-MON.pos.x,tz-MON.pos.z);
+  if(BRAIN.goal&&act!=='hunt'&&dGoal<.7&&!BRAIN.arrived){BRAIN.arrived=true;BRAIN.waitT=act==='search'?1.2+rnd()*1.8:act==='flank'?.25+rnd()*.8:0}
+  if(BRAIN.arrived&&act!=='hunt'){
+    stopMove(dt);
+    if(act==='search'){I.stand=1;I.hunch=.6;I.jaw=.25;const sw=MON.yaw+Math.sin(G.time*1.7)*1.3;I.look.set(MON.pos.x+Math.sin(sw)*3,1.4,MON.pos.z+Math.cos(sw)*3);I.tilt=Math.sin(G.time*.7)*.6;
+      BRAIN.waitT-=dt;if(BRAIN.waitT<=0){if(BRAIN.goal.cell>=0)BRAIN.visited[BRAIN.goal.cell]=G.time;BRAIN.goal=searchGoal();BRAIN.arrived=false;if(rnd()<.3)SND.click()}}
+    else if(act==='flank'){faceTo(player.x,player.z,dt,2);I.tilt=.9;BRAIN.waitT-=dt;if(BRAIN.waitT<=0){BRAIN.action=null;BRAIN.think=0}}
+    else if(act==='ambush'&&BRAIN.peek){const s=BRAIN.peek;MON.yaw=Math.atan2(-s.w.x,-s.w.z);AI.spot=s;
+      BRAIN.peekP=Math.min(1,BRAIN.peekP+dt*.45);AI.t2=BRAIN.peekP;const p=BRAIN.peekP,side=s.side;
+      I.stand=.95;I.hunch=.2;I.lean=side*p*1.15;I.leanF=p*.5;I.tilt=-side*p*1.05;I.jaw=.3+p*.3;I.noDrag=true;I.limp=false;
+      const near=side>0?0:1,far=1-near;
+      I.grip[near]=s.C.clone().addScaledVector(s.n,.1).addScaledVector(s.w,-.1).add(new V3(0,1.62,0));I.gripDir[near]=s.n.clone().multiplyScalar(-1).addScaledVector(UP,.25).normalize();I.curl[near]=.95;
+      I.grip[far]=s.C.clone().addScaledVector(s.n,.1).addScaledVector(s.w,-.1).add(new V3(0,1.15,0));I.gripDir[far]=s.n.clone().multiplyScalar(-1).addScaledVector(UP,-.1).normalize();I.curl[far]=.9;
+      if(AI.watchT>.6||dP<3.5){if(!BRAIN.flagged){BRAIN.flagged=true;SND.click();G.glitch=.45}}
+      if(BRAIN.flagged&&(flick||!G.light||dP<3.5)){BRAIN.flagged=false;AI.spot=null;startAction(rnd()<.55?'hunt':'flank',dP)}
+      if(BRAIN.actT>18){AI.spot=null;BRAIN.action=null}}
+    else if(act==='lurk'){faceTo(player.x,player.z,dt,1.5);I.stand=1;I.hunch=.1;I.jaw=.25;I.tilt=.3+Math.sin(G.time*.4)*.45;I.noDrag=true;
+      if(AI.watchT>.8)BRAIN.seenAtLurk=1;
+      if(BRAIN.seenAtLurk&&!inV){BRAIN.action='hunt';AI.style='walk';BRAIN.think=1.5}
+      if(BRAIN.actT>25){BRAIN.action=null}}
+    else if(act==='retreat'){faceTo(player.x,player.z,dt,1);if(BRAIN.backoffT<=0)BRAIN.action=null}
+  }else{
+    navTo(tx,tz,sp,dt);AI.moved+=MON.speed*dt;
+    if(act==='search'){const sw=MON.yaw+Math.sin(G.time*1.3)*.8;I.look.set(MON.pos.x+Math.sin(sw)*4,1.4,MON.pos.z+Math.cos(sw)*4);I.jaw=.25;I.hunch=.6}
+    if(act==='retreat'){I.look.copy(MON.pos).addScaledVector(fwdOf(MON.yaw),3).setY(.8)}
+    if(!inV&&crawl&&MON.speed>2.5&&rnd()<dt*1.2)SND.slap(.5);
+  }
+  if(dP<.95){kill();return}
+}
+function brainAudio(dP,lit,inV){
+  if(AC){const near=clamp(1-dP/10,0,1);breathG.gain.setTargetAtTime(!lit?(.03+near*.3)*(BRAIN.action==='hunt'?1.3:1):0,AC.currentTime,.15);tensG.gain.setTargetAtTime(inV?.03+near*.05:(BRAIN.action==='hunt'&&dP<12?.025:0),AC.currentTime,.5)}
+  if(dP<9){G.heartT-=1/60;if(G.heartT<=0){G.heartT=Math.max(.3,dP*.11);SND.heart(.12+.3*(1-dP/9))}}
+  AI.gig-=1/60;if(AI.gig<=0){AI.gig=3+rnd()*5;if(dP<16){rnd()<.5?SND.click():SND.creak()}}
+}
+function updateGrab(dt){
+  const t=G.scareT,I=INTENT;resetIntent();
+  const e=(a,b)=>clamp((t-a)/(b-a),0,1),sm=x=>x*x*(3-2*x);
+  // camera: whip round to face it, forced to the knees, then fall to the floor
+  const turn=sm(e(0,.28));let yaw=K.yaw0+angDiff(K.yaw0,K.faceYaw)*turn,pitch=lerp(K.pitch0,.16,turn),y=K.y0,roll=0;
+  if(t>1.3){const k=sm(e(1.3,1.5));y=lerp(K.y0,1.0,k);pitch=lerp(.16,.5,k)}
+  if(t>1.55){const k=sm(e(1.55,2.0));y=lerp(1.0,.22,k);roll=lerp(0,K.side*1.3,k);pitch=lerp(.5,.42,k);yaw+=K.side*.3*k}
+  if(t>1.05&&CR){const hp=CR.B.head_05.getWorldPosition(new V3());const hx=hp.x-K.x,hz=hp.z-K.z,hd=Math.hypot(hx,hz)||.01;const k=sm(e(1.05,1.18));
+    const ty=Math.atan2(-hx,-hz),tp=Math.atan2(hp.y+.04-y,hd);yaw=yaw+angDiff(yaw,ty)*k;pitch=lerp(pitch,tp,k)}
+  K.cam={x:K.x,y,z:K.z,yaw,pitch,roll};
+  const fw=new V3(-Math.sin(K.faceYaw),0,-Math.cos(K.faceYaw)),rt=new V3(Math.cos(K.faceYaw),0,-Math.sin(K.faceYaw));
+  const d=t<.3?lerp(1.25,.95,sm(e(0,.3))):t<1.1?lerp(.95,.62,sm(e(.3,1.1))):t<1.55?lerp(.62,.52,sm(e(1.1,1.22))):lerp(.52,.75,sm(e(1.55,2.05)));K.dist=d;
+  MON.pos.set(K.x+fw.x*d,0,K.z+fw.z*d);MON.yaw=Math.atan2(-fw.x,-fw.z);MON.vel.set(0,0,0);MON.speed=0;
+  const cp=new V3(K.x,y,K.z);I.look.copy(cp);I.noDrag=true;I.limp=false;
+  if(t<1.55){
+    I.stand=1;I.hunch=t<1.1?.08:.3;I.leanF=t<1.1?lerp(0,.35,e(.3,1.1)):.6;I.jaw=t<.3?.5:lerp(.5,1,e(.3,1.0));
+    I.tilt=t<1.1?-1.2*sm(e(.3,1.05)):Math.sin(t*42)*.3;I.choppy=t>1.1;
+    const reach=sm(e(.2,1.05));
+    for(let h=0;h<2;h++){const sg=h?-1:1;const near=cp.clone().addScaledVector(rt,sg*.23).addScaledVector(fw,.08).add(new V3(0,-.05,0));const far=cp.clone().addScaledVector(rt,sg*.6).addScaledVector(fw,.55).add(new V3(0,-.55,0));
+      I.grip[h]=far.lerp(near,reach);I.gripDir[h]=rt.clone().multiplyScalar(-sg).addScaledVector(fw,-.5).normalize();I.curl[h]=lerp(.15,.75,reach)}}
+  else{I.stand=0;I.jaw=1;I.hunch=0;I.tilt=K.side*.9+Math.sin(t*9)*.25;I.choppy=t>2.1;
+    for(let h=0;h<2;h++){const sg=h?-1:1;I.grip[h]=cp.clone().addScaledVector(rt,sg*.32).addScaledVector(fw,.15).setY(.05);I.gripDir[h]=fw.clone().multiplyScalar(-1).add(new V3(0,-.3,0)).normalize();I.curl[h]=.8}}
+  G.killLight=t<1.1?true:t<1.55?rnd()<.45:t<2.35?rnd()<.8:false;
+  if(K.snd===0){K.snd=1;hiss(master,{f:400,f2:2400,q:.8,v:.5,d:.3,a:.02})}
+  if(t>.35&&K.snd===1){K.snd=2;tone(master,{f:900,f2:2600,type:'sine',v:.05,d:.8,a:.6});hiss(monBus||master,{f:700,q:2,v:.4,d:.8,a:.4})}
+  if(t>1.1&&K.snd===2){K.snd=3;SND.scream();SND.jump()}
+  if(t>1.6&&K.snd===3){K.snd=4;hiss(master,{ft:'lowpass',f:160,v:.9,d:.5});tone(master,{f:60,f2:35,v:.5,d:.4})}
+  if(t>2.35&&K.snd===4){K.snd=5;SND.click2()}
+  G.shake=t<1.1?.12:t<1.6?1:.25;G.glitch=t<1.1?.35:1;
+}
 /* ============ LIGHTS ============ */
 G.blackout=function(d){G.boT=Math.max(G.boT,d);SND.thunk();if(AC)humG.gain.setTargetAtTime(0,AC.currentTime,.02)};
 function flickerNear(){for(const p of panels){if(!p.alive)continue;if(Math.hypot(p.x-player.x,p.z-player.z)<7&&rnd()<.5){p.fl=0;p.ft=.05+rnd()*.25}}if(rnd()<.5)SND.buzz()}
@@ -858,8 +1035,8 @@ function updateLights(dt){
   if(G.state==='play'&&!G.paused){G.flickOff-=dt;if(G.fq&&G.fq.length&&G.time>=G.fq[0]){G.fq.shift();if(G.light){G.flickOff=.17+rnd()*.1;SND.flick();G.glitch=Math.max(G.glitch,.5)}}
     else if(G.flickOff<=0&&G.light&&rnd()<G.flickRate*dt){G.flickOff=.06+rnd()*.09;SND.flick()}}
   else if(G.state!=='dying')G.flickOff=0;
-  G.lightNow=G.state==='dying'?rnd()<.55:(G.light&&G.flickOff<=0);
-  flash.intensity=G.lightNow?20:0;spill.intensity=G.lightNow?.35:0;
+  G.lightNow=G.state==='dying'?G.killLight:G.state==='dead'?false:(G.light&&G.flickOff<=0);
+  flash.intensity=G.lightNow?(G.state==='dying'?20*clamp((K.dist||1)/1.1,.18,1):20):0;spill.intensity=G.lightNow?.35:0;
   hemi.intensity=.006;scene.fog.color.setRGB(0,0,0);scene.background.setRGB(0,0,0);
 }
 
@@ -874,14 +1051,14 @@ function showTitle(){
   show(`<div class="tape"><div class="label"><div class="top"><span>T-120 · SP</span><span>TAPE 07</span></div>
   <h1>NOCLIP</h1><div class="hand">${H.playT>60?'it remembers you.':'level 0. do not rewind.'}</div>
   <p>You were carrying a box down the basement stairs. You leaned on the wall and the wall wasn't there. Now it's damp carpet, dead lights and total dark. The camcorder light is the only light there is.</p>
-  <p>Someone was here before you. They left five notes on the walls. Find them, and find the way out. Something tall in here is always smiling. It cannot move while your light is on it. Your light does not like it being near.</p>
+  <p>Someone was here before you. They left five notes on the walls. Find them, and find the way out. Something tall in here is always smiling. It cannot move while your light is on it, but your light shows it where you are. It learns how you play.</p>
   <div class="ctrl"><kbd>WASD</kbd>move <kbd>SHIFT</kbd>run <kbd>C</kbd>crouch · look: mouse (click), drag, or <kbd>ARROWS</kbd><br><kbd>E</kbd>read / open <kbd>F</kbd>light on/off <kbd>M</kbd>map · keep the light on it. every flicker, it moves.</div></div>
   <div class="actions"><span class="fine">HEADPHONES. LIGHTS OFF.</span><button type="button" data-go id="goTitle" ${modelReady?'':'disabled'}>${modelReady?'▶ PLAY':'LOADING…'}</button></div></div>`);
   $('goTitle').onclick=()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();newGame()};
 }
 function newGame(){H.games++;saveH();
-  RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
-  placeNotes();AI.first=true;AI.chain=0;spawnPlayer(START.x,START.y);hideMonster(9);startPlay();
+  RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.trail=[];G.sights=[];G.heat=new Float32Array(GW*GH);G.fq=[];G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
+  placeNotes();AI.first=true;AI.chain=0;spawnPlayer(START.x,START.y);brainReset(14);startPlay();
   setTimeout(()=>caption('[The hum. The carpet is wet under your shoes.]'),900);
 }
 function spawnPlayer(cx,cy){player.x=(cx+.5)*CS;player.z=(cy+.5)*CS;let best=0,by=0;for(let k=0;k<24;k++){const a=k/24*Math.PI*2,fx=-Math.sin(a),fz=-Math.cos(a);let d=0;while(d<30&&losXZ(player.x,player.z,player.x+fx*(d+.5),player.z+fz*(d+.5)))d+=.5;if(d>best){best=d;by=a}}player.yaw=by;player.pitch=0;G.stam=100}
@@ -892,7 +1069,7 @@ function showDeath(){
   <h2>SIGNAL LOST</h2><p>The tape keeps running for another forty seconds. Nothing on it but black, and the sound of something wet and very close, breathing through its smile.</p>
   ${habitLines().length?`<p style="color:#c9b45a">IT HAS LEARNED: ${habitLines().join(' · ')}.</p>`:''}<p style="color:#8f8b78">It only moves when your light is off it. Each flicker is a step closer. Back away with the beam on it, and check behind you.</p></div>
   <div class="actions"><span class="fine">YOUR NOTES ARE KEPT</span><button type="button" data-go id="goRetry">◀◀ REWIND</button></div></div>`);
-  $('goRetry').onclick=()=>{let b=null,bd=0;for(let t=0;t<80;t++){const x=rnd()*GW|0,y=rnd()*GH|0,d=Math.hypot(x-START.x,y-START.y)+rnd()*3;if(d>bd){bd=d;b=[x,y]}}spawnPlayer(b[0],b[1]);hideMonster(G.exitOpen?6:12);startPlay();caption('[You come to on the carpet. It let you go. For now.]')};
+  $('goRetry').onclick=()=>{let b=null,bd=0;for(let t=0;t<80;t++){const x=rnd()*GW|0,y=rnd()*GH|0,d=Math.hypot(x-START.x,y-START.y)+rnd()*3;if(d>bd){bd=d;b=[x,y]}}spawnPlayer(b[0],b[1]);brainReset(G.exitOpen?4:10);startPlay();caption('[You come to on the carpet. It let you go. For now.]')};
 }
 function showEnding(){
   G.state='end';$('hud').hidden=true;
@@ -904,23 +1081,41 @@ function showEnding(){
   $('goAgain').onclick=()=>newGame();
 }
 function readNote(n){
-  n.taken=true;levelGroup.remove(n.mesh);if(n.snd){try{n.snd.s.stop();n.snd.lfo.stop()}catch(e){}}G.notes++;SND.paper();G.paused=true;unlock();
+  n.taken=true;n.order=G.notes+1;levelGroup.remove(n.mesh);if(n.snd){try{n.snd.s.stop();n.snd.lfo.stop()}catch(e){}}G.notes++;SND.paper();G.paused=true;unlock();
   const w=$('noteWrap');w.innerHTML=`<div class="note"><div class="who">NOTE ${G.notes} OF 5 · WANDERER 7</div><div class="body">${NOTES_TXT[G.notes-1]}</div><button type="button" id="noteClose">KEEP IT · E</button></div>`;
   w.hidden=false;$('noteClose').onclick=closeNote;$('noteClose').focus({preventScroll:true});
 }
-function closeNote(){$('noteWrap').hidden=true;G.paused=false;lock();
-  if(G.notes>=5&&!G.exitOpen){openExit();caption('[Somewhere far away, a door creaks open.]');setTimeout(()=>caption('[Press M. The door is marked on your map.]'),2500);hideMonster(4)}
+function closeNote(){$('noteWrap').hidden=true;G.paused=false;lock();G.hintIdx=nearestNote(player.x,player.z);if(G.notes===1)setTimeout(()=>caption('[The back of the note has a scribbled map. Press M.]'),1200);
+  if(G.notes>=5&&!G.exitOpen){openExit();caption('[Somewhere far away, a door creaks open.]');setTimeout(()=>caption('[Press M. The door is marked on your map.]'),2500);BRAIN.backoffT=4}
   else if(AI.state==='hidden')AI.next=Math.min(AI.next,4+rnd()*4)}
-function toggleMap(force){const w=$('mapWrap');const open=force!==undefined?force:w.hidden;if(open&&G.state!=='play')return;w.hidden=!open;G.paused=open;if(open){unlock();drawMap()}else lock()}
+function toggleMap(force){const w=$('mapWrap');const open=force!==undefined?force:w.hidden;if(open&&G.state!=='play')return;w.hidden=!open;if(open){drawMap();SND.paper()}}
+const jit=(a,b)=>{const h=Math.sin(a*127.1+b*311.7)*43758.5453;return h-Math.floor(h)-.5};
 function drawMap(){
-  const c=$('mapCv'),g=c.getContext('2d'),S=c.width/GW;g.fillStyle='#0b0a06';g.fillRect(0,0,c.width,c.height);
-  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)if(G.explored[y*GW+x]){g.fillStyle=cellLight[y*GW+x]>.3?'rgba(201,180,90,.32)':'rgba(120,110,70,.2)';g.fillRect(x*S,y*S,S,S)}
-  g.strokeStyle='#ecebdf';g.lineWidth=2;g.beginPath();
-  for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hE[hI(x,y)]&&((y<GH&&G.explored[y*GW+x])||(y>0&&G.explored[(y-1)*GW+x]))){g.moveTo(x*S,y*S);g.lineTo((x+1)*S,y*S)}
-  for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vE[vI(x,y)]&&((x<GW&&G.explored[y*GW+x])||(x>0&&G.explored[y*GW+x-1]))){g.moveTo(x*S,y*S);g.lineTo(x*S,(y+1)*S)}
-  g.stroke();
-  if(exitDoor){g.fillStyle='#ff3a24';g.font='bold 18px VT323,monospace';g.fillRect(exitDoor.x/CS*S-6,exitDoor.z/CS*S-6,12,12);g.fillText('EXIT',exitDoor.x/CS*S+9,exitDoor.z/CS*S+5)}
-  const px=player.x/CS*S,pz=player.z/CS*S;g.save();g.translate(px,pz);g.rotate(-player.yaw+Math.PI);g.fillStyle='#e0322a';g.beginPath();g.moveTo(0,-9);g.lineTo(6,7);g.lineTo(-6,7);g.closePath();g.fill();g.restore();
+  const c=$('mapCv'),g=c.getContext('2d'),W=c.width,S=W/GW;g.clearRect(0,0,W,W);
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++)if(G.explored[y*GW+x]){g.fillStyle=`rgba(90,70,30,${.1+Math.min(.12,(G.heat?G.heat[y*GW+x]:0)*.004)})`;g.fillRect(x*S,y*S,S+.5,S+.5)}
+  // pencil walls
+  g.strokeStyle='rgba(40,38,44,.85)';g.lineCap='round';
+  const line=(x1,y1,x2,y2,k)=>{g.lineWidth=1.8+jit(k,1)*.8;g.beginPath();g.moveTo(x1+jit(k,2)*1.6,y1+jit(k,3)*1.6);g.lineTo(x2+jit(k,4)*1.6,y2+jit(k,5)*1.6);g.stroke()};
+  for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hE[hI(x,y)]&&((y<GH&&G.explored[y*GW+x])||(y>0&&G.explored[(y-1)*GW+x])))line(x*S,y*S,(x+1)*S,y*S,x*31+y*7);
+  for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vE[vI(x,y)]&&((x<GW&&G.explored[y*GW+x])||(x>0&&G.explored[y*GW+x-1])))line(x*S,y*S,x*S,(y+1)*S,x*13+y*57);
+  // trail
+  if(G.trail.length>1){g.strokeStyle='rgba(43,58,122,.45)';g.lineWidth=1.6;g.setLineDash([3,5]);g.beginPath();G.trail.forEach((p,i)=>{const X=p.x/CS*S,Y=p.z/CS*S;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.lineTo(player.x/CS*S,player.z/CS*S);g.stroke();g.setLineDash([])}
+  // hint for the next note
+  const hn=G.hintIdx>=0?notes[G.hintIdx]:null;
+  if(hn&&!hn.taken){const X=hn.hint.x/CS*S,Y=hn.hint.z/CS*S,r=S*2.4;g.strokeStyle='rgba(122,74,16,.8)';g.lineWidth=2;g.beginPath();for(let a=0;a<=Math.PI*2.1;a+=.2){const rr=r*(1+jit(a,9)*.12);g.lineTo(X+Math.cos(a)*rr,Y+Math.sin(a)*rr)}g.stroke();
+    g.fillStyle='rgba(122,74,16,.9)';g.font=`${S*1.3}px Caveat,cursive`;g.textAlign='center';g.textBaseline='middle';g.fillText('?',X,Y)}
+  // notes found
+  g.font=`${S*.8}px VT323,monospace`;g.textAlign='center';g.textBaseline='middle';
+  notes.forEach((n,i)=>{if(!n.taken)return;const X=n.pos.x/CS*S,Y=n.pos.z/CS*S;g.fillStyle='#2b2a30';g.fillRect(X-S*.32,Y-S*.32,S*.64,S*.64);g.fillStyle='#e4dcc3';g.fillText(String(n.order||i+1),X,Y+1)});
+  // sightings
+  G.sights.forEach(sg=>{const age=G.time-sg.t,al=clamp(1-age/150,.25,1);const X=sg.x/CS*S,Y=sg.z/CS*S,k=S*.42;g.strokeStyle=`rgba(168,40,29,${al})`;g.lineWidth=2.6;g.beginPath();g.moveTo(X-k,Y-k);g.lineTo(X+k,Y+k);g.moveTo(X+k,Y-k);g.lineTo(X-k,Y+k);g.stroke();
+    if(age<600){g.fillStyle=`rgba(168,40,29,${al})`;g.font=`${S*.62}px VT323,monospace`;g.fillText(age<60?`${age|0}s`:`${age/60|0}m`,X,Y+k+S*.4)}});
+  if(exitDoor){const X=exitDoor.x/CS*S,Y=exitDoor.z/CS*S;g.fillStyle='#b8372d';g.fillRect(X-S*.5,Y-S*.5,S,S);g.font=`${S*1.1}px Caveat,cursive`;g.fillText('EXIT!',X,Y-S*1.1)}
+  // you + view cone
+  const px=player.x/CS*S,pz=player.z/CS*S,fa=Math.atan2(-Math.cos(player.yaw),-Math.sin(player.yaw));
+  if(G.light){g.fillStyle='rgba(255,220,120,.35)';g.beginPath();g.moveTo(px,pz);g.arc(px,pz,S*3.2,fa-.45,fa+.45);g.closePath();g.fill()}
+  g.save();g.translate(px,pz);g.rotate(fa+Math.PI/2);g.fillStyle='#2b3a7a';g.beginPath();g.moveTo(0,-S*.55);g.lineTo(S*.38,S*.4);g.lineTo(-S*.38,S*.4);g.closePath();g.fill();g.restore();
+  g.fillStyle='#2b3a7a';g.font=`${S*1.1}px Caveat,cursive`;g.fillText('N',W-S,S*1.1);
 }
 const fmtTime=t=>{t=Math.floor(t);return`${Math.floor(t/3600)}:${String(Math.floor(t/60)%60).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`};
 
@@ -951,14 +1146,15 @@ $('joy').addEventListener('pointerdown',e=>{e.stopPropagation();joy.id=e.pointer
 const tap=(id,fn)=>$(id).addEventListener('pointerdown',e=>{e.preventDefault();fn()});
 tap('bUse',()=>{ePress=true});tap('bLight',()=>{G.light=!G.light;SND.click2()});tap('bCrouch',()=>{G.crouch=!G.crouch});tap('bMap',()=>toggleMap());
 $('bRun').addEventListener('pointerdown',e=>{e.preventDefault();tRun=true});['pointerup','pointerleave','pointercancel'].forEach(ev=>$('bRun').addEventListener(ev,()=>tRun=false));
-$('mapWrap').addEventListener('click',()=>toggleMap(false));
+
 
 /* ============ PLAYER ============ */
 function updatePlayer(dt){
+  if(player.px!==undefined&&dt>0){player.vx=damp(player.vx||0,(player.x-player.px)/dt,5,dt);player.vz=damp(player.vz||0,(player.z-player.pz)/dt,5,dt)}
   const turn=2.2*dt;if(keys.ArrowLeft)player.yaw+=turn;if(keys.ArrowRight)player.yaw-=turn;if(keys.ArrowUp)player.pitch=clamp(player.pitch+turn*.7,-1.35,1.35);if(keys.ArrowDown)player.pitch=clamp(player.pitch-turn*.7,-1.35,1.35);
   const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);let f=0,s=0;if(keys.KeyW)f++;if(keys.KeyS)f--;if(keys.KeyD)s++;if(keys.KeyA)s--;f-=joy.y;s+=joy.x;
   let ix=fx*f-fz*s,iz=fz*f+fx*s;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}
-  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;trackHabits(dt,run);player.vx=ix*(run?4.6:2.3);player.vz=iz*(run?4.6:2.3);
+  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;trackHabits(dt,run);
   G.stam=clamp(G.stam+(run?-20:11)*dt,0,100);
   const sp=run?4.6:G.crouch?1.3:2.3;
   const p={x:player.x+ix*sp*dt,z:player.z+iz*sp*dt};collide(p,.3);player.x=p.x;player.z=p.z;
@@ -966,15 +1162,20 @@ function updatePlayer(dt){
   if(moving){player.walk+=dt*sp*2.2;player.stepT-=dt*sp;if(player.stepT<=0){player.stepT=1.25;SND.pStep()}}
   player.y=damp(player.y,G.crouch?CEYE:EYE,10,dt);
   player.ang=Math.atan2(fz,fx);
+  player.px=player.x;player.pz=player.z;
   // interact
   let prompt='';const cp=camera.position,cf=new V3(0,0,-1).applyQuaternion(camera.quaternion);
   for(const n of notes){if(n.taken)continue;const d=Math.hypot(n.pos.x-player.x,n.pos.z-player.z);if(d<1.5){const v=new V3(n.pos.x-cp.x,n.pos.y-cp.y,n.pos.z-cp.z).normalize();if(v.dot(cf)>.55){prompt='<kbd>E</kbd>READ NOTE';if(ePress){readNote(n);ePress=false}}}}
   if(exitDoor&&Math.hypot(exitDoor.x-player.x,exitDoor.z-player.z)<1.6){prompt='<kbd>E</kbd>OPEN THE DOOR';if(ePress){showEnding();ePress=false;return}}
   ePress=false;const pr=$('prompt');if(prompt){if(pr.innerHTML!==prompt)pr.innerHTML=prompt;pr.hidden=false}else pr.hidden=true;
   // explore
+  {const[hx,hy]=cellOf(player.x,player.z);if(G.heat)G.heat[hy*GW+hx]+=dt}
+  G.trailT=(G.trailT||0)-dt;if(G.trailT<=0){G.trailT=1.2;G.trail.push({x:player.x,z:player.z});if(G.trail.length>400)G.trail.shift()}
+  if(!$('mapWrap').hidden){G.mapT=(G.mapT||0)-dt;if(G.mapT<=0){G.mapT=.2;drawMap()}}
   G.exploreT-=dt;if(G.exploreT<=0){G.exploreT=.25;const[pcx,pcy]=cellOf(player.x,player.z);for(let y=pcy-3;y<=pcy+3;y++)for(let x=pcx-3;x<=pcx+3;x++)if(inCell(x,y)&&!G.explored[y*GW+x]&&losXZ(player.x,player.z,(x+.5)*CS,(y+.5)*CS))G.explored[y*GW+x]=1}
 }
 function placeCamera(dt){
+  if((G.state==='dying'||G.state==='dead')&&K.cam){const c=K.cam,sh=(G.state==='dying'?G.shake:0)*.05;camera.position.set(c.x+(rnd()-.5)*sh,c.y+(rnd()-.5)*sh,c.z+(rnd()-.5)*sh);camera.rotation.set(c.pitch+(rnd()-.5)*sh*.6,c.yaw,c.roll);return}
   if(G.state==='title'||G.state==='loading'){G.time+=0;const t=performance.now()/1000*.05;camera.position.set((START.x+.5)*CS+Math.sin(t)*2,1.6,(START.y+.5)*CS+Math.cos(t*.7)*2);camera.rotation.set(0,t*2,0);return}
   const bob=Math.sin(player.walk)*.035,sway=Math.cos(player.walk*.5)*.02;G.shake=Math.max(0,G.shake-dt);const sh=G.shake*.06;
   camera.position.set(player.x+(rnd()-.5)*sh,player.y+bob+(rnd()-.5)*sh,player.z+(rnd()-.5)*sh);
@@ -994,9 +1195,9 @@ let last=performance.now();
 function frame(dt){
   if(G.state==='play'&&!G.paused){G.time+=dt;updatePlayer(dt);if(G.state==='play')updateAI(dt);updateHUD();tickCaps(dt)}
   placeCamera(dt);camera.updateMatrixWorld();
-  if(G.state==='dying'){G.scareT+=dt;updateGrab(dt);G.shake=.9;G.glitch=1;if(G.scareT>1.5)showDeath()}
+  if(G.state==='dying'){G.scareT+=dt;updateGrab(dt);if(G.scareT>2.75)showDeath()}
   updateLights(dt);
-  if(CR&&MON.visible&&!G.paused&&!(MON.frozen&&G.state==='play')){if(computePose(dt))CR.apply(POSE);if(AI.state==='peek'&&AI.spot)peekAdjust(AI.spot,AI.t2)}
+  if(CR&&MON.visible&&!G.paused&&!(MON.frozen&&G.state==='play')){if(computePose(dt))CR.apply(POSE);if(AI.spot&&(AI.state==='peek'||(BRAIN.action==='ambush'&&BRAIN.arrived)))peekAdjust(AI.spot,AI.t2)}
   if(AC&&MON.visible&&CR){const h=CR.B.head_05.getWorldPosition(_e);setPos(monPan,h.x,h.y,h.z)}
   updateListener();
   G.glitch=Math.max(0,G.glitch-dt*.8);const dP=MON.visible?Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z):99;
@@ -1032,7 +1233,7 @@ if(DEBUG)window.__dbg=function(mode,secs){
   if(mode==='side'){placeMonster(sx,sz-3,Math.PI/2,1);for(let i=0;i<steps;i++){resetIntent();INTENT.look.set(sx+5,1.6,sz-3);INTENT.stand=1;INTENT.hunch=.4;INTENT.noDrag=true;computePose(dt);CR.apply(POSE)}}
   if(mode==='walk'){placeMonster(sx-2.2,sz-3,Math.PI/2,1);for(let i=0;i<steps;i++){resetIntent();INTENT.look.copy(camera.position);INTENT.stand=.9;INTENT.hunch=.6;INTENT.noDrag=true;const t=new V3(sx+6,0,sz-3);navTo(t.x,t.z,1.1,dt);computePose(dt);CR.apply(POSE)}}
   if(mode==='crawl'){placeMonster(sx-4.2,sz-2.6,Math.PI/2,0);for(let i=0;i<steps;i++){resetIntent();INTENT.look.copy(camera.position);INTENT.stand=0;INTENT.jaw=.9;navTo(sx+12,sz-2.6,4.5,dt);computePose(dt);CR.apply(POSE)}}
-  if(mode==='grab'){G.scareT=0;for(let i=0;i<steps;i++){G.scareT+=dt;updateGrab(dt);computePose(dt);CR.apply(POSE)}}
+  if(mode==='grab'){placeMonster(sx,sz-2,Math.PI,0);beginKill();G.scareT=0;for(let i=0;i<steps;i++){G.scareT+=dt;updateGrab(dt);computePose(dt);CR.apply(POSE)}G.state='dying';placeCamera(0);camera.updateMatrixWorld();G.lightNow=true;flash.intensity=20;composer.render(1/60);G.state='debug';return renderer.domElement.toDataURL('image/jpeg',.85)}
   if(mode==='peek'){let s=null;for(let tries=0;tries<400&&!s;tries++){const x=2+(rnd()*(GW-4)|0),y=2+(rnd()*(GH-4)|0);player.x=(x+.5)*CS;player.z=(y+.5)*CS;camera.position.set(player.x,EYE,player.z);s=findPeek(4,7)}
     if(!s)return 'nopeek';const yaw=Math.atan2(s.H.x-player.x,s.H.z-player.z);player.yaw=yaw+Math.PI;camera.rotation.set(-.05,player.yaw,0);camera.updateMatrixWorld();
     AI.spot=s;const fwd=s.w.clone().multiplyScalar(-1);const my=Math.atan2(fwd.x,fwd.z);s.side=leftOf(my).dot(s.n)<0?1:-1;placeMonster(s.M.x,s.M.z,my,.95);setAI('peek');
@@ -1048,7 +1249,7 @@ if(DEBUG)window.__dbg=function(mode,secs){
   composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85);
 };
 function initAudioStub(){}
-if(DEBUG){window.__los=losXZ;window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
+if(DEBUG){window.__BRAIN=BRAIN;window.__BR=BR;window.__toggleMap=toggleMap;window.__los=losXZ;window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
   window.__force=(ev)=>{const f={stare:()=>spawnStare(10,22,false)||spawnStare(10,22,true),peek:spawnPeek,cross:spawnCross,behind:spawnBehind}[ev];return f?f():false};
   window.__shot=()=>{composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85)};
   window.__lookAtMon=()=>{const dx=MON.pos.x-player.x,dz=MON.pos.z-player.z;player.yaw=Math.atan2(-dx,-dz);player.pitch=-.05}}
