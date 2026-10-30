@@ -312,7 +312,7 @@ function vmApply(T){
     const f=t.f.clone().normalize(),sd=t.s.clone();sd.addScaledVector(f,-sd.dot(f)).normalize();
     const qd=new Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(sd,new V3().crossVectors(f,sd),f)).multiply(H.basisInv).multiply(H.wrist.userData.Q0);
     setWorldQ(H.wrist,qd);
-    H.fingers.forEach((fg,fi)=>{const c=fg.thumb?t.thumb:t.curl*(t.cm?t.cm[fi]:1);fg.segs.forEach((sg,k)=>{sg.b.quaternion.copy(_q1.setFromAxisAngle(sg.ax,c*(k===0?.9:1.15))).multiply(sg.b.userData.q0l)})})}
+    H.fingers.forEach((fg,fi)=>{const c=fg.thumb?t.thumb:t.curl+(t.cm?t.cm[fi]:0);fg.segs.forEach((sg,k)=>{sg.b.quaternion.copy(_q1.setFromAxisAngle(sg.ax,c*(k===0?.9:1.15))).multiply(sg.b.userData.q0l)})})}
   VM.holder.updateMatrixWorld(true)}
 /* ---- camcorder model (scanned), its live LCD and held items ---- */
 function normalizeCamcorder(gltf){
@@ -381,12 +381,12 @@ vmBattery.visible=false;vmScene.add(vmBattery);
 let vmNote={visible:false};
 /* ---- poses ---- */
 const CC_BASE=new V3(.125,-.135,-.31);
-const RPOLE=new V3(-.2,-1,-.3);// elbow straight down below the camcorder, so the forearm stays under it
-// palm under the body, fingers curling up the right side through the hand strap
-const GRIP_R={p:new V3(-.012,-.137,-.021),f:new V3(.623,.773,-.121),s:new V3(.077,.093,.993),curl:0.15,thumb:0.9,cm:[0.9,1,0.8,0.6]};
+const RPOLE=new V3(1,-0.8,0.3);// right elbow out to the lower right, so the forearm comes in from the bottom right
+// palm cupping the bottom-right edge, fingers running up the right side under the hand strap
+const GRIP_R={p:new V3(0.004,-0.117,0.081),f:new V3(0.5,0.55,-0.67),s:new V3(0.343,0.584,0.736),curl:0,thumb:0.9,cm:[0.05,0,-0.2,-0.35]};
 const SUPPORT_L={p:new V3(-.005,.075,.085),f:new V3(.05,-.12,-1),s:new V3(1,0,0),curl:.55,thumb:.2};
 function inCC(pose,ccp,ccq){return{p:pose.p.clone().applyQuaternion(ccq).add(ccp),f:pose.f.clone().applyQuaternion(ccq),s:pose.s.clone().applyQuaternion(ccq),curl:pose.curl,thumb:pose.thumb,cm:pose.cm&&pose.cm.slice()}}
-function blendPose(a,b,k){if(k<=0)return a;a.p.lerp(b.p,k);a.f.lerp(b.f,k);a.s.lerp(b.s,k);a.curl=lerp(a.curl,b.curl,k);a.thumb=lerp(a.thumb,b.thumb,k);if(a.cm||b.cm)a.cm=[0,1,2,3].map(i=>lerp(a.cm?a.cm[i]:1,b.cm?b.cm[i]:1,k));return a}
+function blendPose(a,b,k){if(k<=0)return a;a.p.lerp(b.p,k);a.f.lerp(b.f,k);a.s.lerp(b.s,k);a.curl=lerp(a.curl,b.curl,k);a.thumb=lerp(a.thumb,b.thumb,k);if(a.cm||b.cm)a.cm=[0,1,2,3].map(i=>lerp(a.cm?a.cm[i]:0,b.cm?b.cm[i]:0,k));return a}
 function vmOnFlick(){if(G.state!=='play'||!VM.ready)return;const dP=MON.visible?Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z):99;
   if(dP<9&&VM.slapCool<=0&&!VM.reach&&!G.mapOpen&&rnd()<.55){VM.slap={t:0};VM.slapCool=2.2}}
 function vmReach(worldPos,fn,kind){if(!VM.ready||VM.reach){fn('grab');fn('use');return}
@@ -458,7 +458,7 @@ function vmUpdate(dt){
   if(mode==='box'||mode==='push'||mode==='walk'){VM.ccPos.snap(cc);VM.ccQ.copy(qccT)}
   VM.cc.position.copy(VM.ccPos.x);VM.cc.quaternion.copy(VM.ccQ);
   // ---- right hand: always on the camcorder grip
-  const Rr=Object.assign(inCC(GRIP_R,VM.ccPos.x,VM.ccQ),{pole:RPOLE.clone()});if(VM.press>0){Rr.cm=Rr.cm.slice();Rr.cm[0]-=Math.sin(Math.min(1,VM.press)*Math.PI)*1.1}
+  const Rr=Object.assign(inCC(GRIP_R,VM.ccPos.x,VM.ccQ),{pole:RPOLE.clone()});if(VM.press>0){Rr.cm=Rr.cm.slice();Rr.cm[0]-=Math.sin(Math.min(1,VM.press)*Math.PI)*.8}
   // ---- reach for a pickup: grab it, then bring it where it goes
   vmBattery.visible=false;vmNote.visible=false;
   VM.dip=0;VM.dipP=0;
@@ -508,7 +508,7 @@ function vmUpdate(dt){
   const stiff=mode==='kill'?900:mode==='box'||mode==='push'?260:VM.reach||VM.slap?520:mode==='pickup'?300:240;
   const nsub=Math.max(1,Math.ceil(dt*120)),sd=dt/nsub;for(let i=0;i<nsub;i++){VM.S.L.step(L.p,stiff,sd);VM.S.R.step(Rr.p,mode==='play'||mode==='walk'?2000:stiff*1.6,sd);for(const[s,t]of[['L',L],['R',Rr]]){VM.C[s].c.step(t.curl,mode==='kill'?500:160,sd);VM.C[s].t.step(t.thumb,200,sd)}}
   for(const[s,t]of[['L',L],['R',Rr]]){const D=VM.D[s];const r=s==='R'&&(mode==='play'||mode==='walk')?40:16;D.f.lerp(t.f.clone().normalize(),1-Math.exp(-dt*r)).normalize();D.s.lerp(t.s.clone().normalize(),1-Math.exp(-dt*r)).normalize()}
-  VM.cmR=VM.cmR||[1,1,1,1];{const tc=Rr.cm||[1,1,1,1];for(let i=0;i<4;i++)VM.cmR[i]+=(tc[i]-VM.cmR[i])*Math.min(1,dt*10)}
+  VM.cmR=VM.cmR||[0,0,0,0];{const tc=Rr.cm||[0,0,0,0];for(let i=0;i<4;i++)VM.cmR[i]+=(tc[i]-VM.cmR[i])*Math.min(1,dt*10)}
   vmApply({L:{p:VM.S.L.x,f:VM.D.L.f,s:VM.D.L.s,curl:VM.C.L.c.x,thumb:VM.C.L.t.x,pole:L.pole},R:{p:VM.S.R.x,f:VM.D.R.f,s:VM.D.R.s,curl:VM.C.R.c.x,thumb:VM.C.R.t.x,cm:VM.cmR,pole:Rr.pole||new V3(1,-.7,.5)}});
   // held items sit in the left palm
   if(vmBattery.visible||vmNote.visible){const H=VM.hands.L;const wp=H.wrist.getWorldPosition(new V3());const f=VM.D.L.f,s=VM.D.L.s;const palm=new V3().crossVectors(f,s).normalize().negate();
