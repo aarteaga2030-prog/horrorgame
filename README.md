@@ -18,7 +18,7 @@ It uses `smily_horror_monster.glb`, scaled to stand 2.35 m (about 7'8") tall. It
 
 ## The intro
 
-You carry the last box down the basement stairs, lean on the wall, and fall through it. You drop through the ceiling of somewhere else and land on damp carpet under humming lights. Then the lights die one by one, far to near. In the last of the light, something is standing at the end of the hall. Your camera light clicks on and the hall is empty. Press E or tap to skip.
+You carry the last box down the basement stairs, lean on the wall, and fall through it. You drop through the ceiling of somewhere else and land on damp carpet under humming lights. Then the lights die one by one, far to near. The box you were carrying lands next to you, torn open, with your camcorder inside. You kneel, reach in with both hands and pick it up, and its little screen flickers on. In the last of the light, something is standing at the end of the hall. Your camera light clicks on and the hall is empty. Press E or tap to skip.
 
 ## The level
 
@@ -68,9 +68,10 @@ Stare at it too long and it forces a burst of flickers and bolts for the nearest
 
 You see your own gloved arms (`fps_arms.glb`), posed live every frame with the same IK system as the monster:
 
-- **Camcorder:** your right hand grips it, wrapped over the top. It sways when you walk, shakes when you sprint, and your thumb presses the switch when you toggle the light (F).
+- **Camcorder:** a real camcorder model (`camcorder.glb`) held in your right hand, fingers wrapped around its side. Its flip-out screen shows a live mini feed of what the camera sees, with a REC dot, timecode and battery level. If you walk up against a wall it pulls back toward you instead of poking through.
+- **Bob:** your hands and your view bob and sway as you walk, harder when you sprint, and lag a little behind when you turn.
 - **Left hand:** hangs low while walking, pumps as a fist when you sprint, and pulls in when you crouch.
-- **Pickups:** it reaches out and grabs notes and batteries.
+- **Pickups:** you step in and reach for notes (you hold each one up to read it) and kneel for batteries, which you snap into the camcorder.
 - **Panic:** when the light flickers with the monster nearby, it sometimes smacks the camcorder.
 - **The map (M):** you hold the paper up in your left hand. It's a real object in front of you, lit by your light, and the game keeps running.
 - **The kill:** both hands come up to shield your face, get shoved aside, and the camcorder falls.
@@ -112,8 +113,11 @@ Then open http://localhost:8000.
 
 - `index.html`: the whole game (Three.js r160 from a CDN, no build step)
 - `smily_horror_monster.glb`: the monster's model and skeleton
+- `fps_arms.glb`: your arms
+- `camcorder.glb`: the camcorder
 
 ## Credits
 
 - Monster: "Smily horror monster" (CC BY 4.0), from Sketchfab.
 - Arms: "fps arms" (CC BY 4.0), from Sketchfab.
+- Camcorder: "Camcorder" by omegadarling (CC BY 4.0), from Sketchfab.
