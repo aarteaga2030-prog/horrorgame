@@ -381,9 +381,9 @@ vmBattery.visible=false;vmScene.add(vmBattery);
 let vmNote={visible:false};
 /* ---- poses ---- */
 const CC_BASE=new V3(.125,-.135,-.31);
-const RPOLE=new V3(-.6,-1,.2);// elbow tucked down and in, so the forearm comes up under the camcorder
+const RPOLE=new V3(-.2,-1,-.3);// elbow straight down below the camcorder, so the forearm stays under it
 // palm under the body, fingers curling up the right side through the hand strap
-const GRIP_R={p:new V3(-.042,-.109,.007),f:new V3(.85,.5,-.15),s:new V3(.134,.068,.989),curl:.3,thumb:.4,cm:[.9,1,.7,.5]};
+const GRIP_R={p:new V3(-.012,-.137,-.021),f:new V3(.623,.773,-.121),s:new V3(.077,.093,.993),curl:0.15,thumb:0.9,cm:[0.9,1,0.8,0.6]};
 const SUPPORT_L={p:new V3(-.005,.075,.085),f:new V3(.05,-.12,-1),s:new V3(1,0,0),curl:.55,thumb:.2};
 function inCC(pose,ccp,ccq){return{p:pose.p.clone().applyQuaternion(ccq).add(ccp),f:pose.f.clone().applyQuaternion(ccq),s:pose.s.clone().applyQuaternion(ccq),curl:pose.curl,thumb:pose.thumb,cm:pose.cm&&pose.cm.slice()}}
 function blendPose(a,b,k){if(k<=0)return a;a.p.lerp(b.p,k);a.f.lerp(b.f,k);a.s.lerp(b.s,k);a.curl=lerp(a.curl,b.curl,k);a.thumb=lerp(a.thumb,b.thumb,k);if(a.cm||b.cm)a.cm=[0,1,2,3].map(i=>lerp(a.cm?a.cm[i]:1,b.cm?b.cm[i]:1,k));return a}
@@ -435,7 +435,7 @@ function vmUpdate(dt){
   const wantMap=mode==='play'&&G.mapOpen;VM.mapK=damp(VM.mapK,wantMap?1:0,9,dt);
   // ---- camcorder pose
   const cc=CC_BASE.clone().add(bob);cc.y-=crouch?.02:0;cc.z+=crouch?.02:0;cc.add(new V3(.02,-.05,.11).multiplyScalar(VM.retract));
-  const rot=new V3(-.08-VM.jolt*.25-VM.press*.06+VM.mapK*.15-VM.retract*.35,.18+VM.retract*.3,-.22+bobRoll+(run?Math.sin(gp)*.05:0));
+  const rot=new V3(-.08-VM.jolt*.25-VM.press*.06+VM.mapK*.15-VM.retract*.35,.18+VM.retract*.3,.04+bobRoll+(run?Math.sin(gp)*.05:0));
   cc.y-=VM.jolt*.02;cc.addScaledVector(new V3(.025,-.05,.03),VM.mapK);
   const qccT=new Q().setFromEuler(new THREE.Euler(rot.x,rot.y,rot.z));
   // ---- left hand default
