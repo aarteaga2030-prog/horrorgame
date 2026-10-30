@@ -64,9 +64,21 @@ Stare at it too long and it forces a burst of flickers and bolts for the nearest
 
 **It was trained by self-play.** Bot players (one careful, one that sprints everywhere, one that wanders) played thousands of matches against it. A search process tuned its numbers (how it weighs each tactic, how fast it moves, how often your light flickers, how soon it bolts when stared at) to catch players as effectively as possible while a careful player still survives about a third of the time. To run the harness yourself, open `index.html#debug` and call `__runSim({}, 'careful', 120)` from the console.
 
+## Your arms
+
+You see your own gloved arms (`fps_arms.glb`), posed live every frame with the same IK system as the monster:
+
+- **Camcorder:** your right hand grips it, wrapped over the top. It sways when you walk, shakes when you sprint, and your thumb presses the switch when you toggle the light (F).
+- **Left hand:** hangs low while walking, pumps as a fist when you sprint, and pulls in when you crouch.
+- **Pickups:** it reaches out and grabs notes and batteries.
+- **Panic:** when the light flickers with the monster nearby, it sometimes smacks the camcorder.
+- **The map (M):** you hold the paper up in your left hand. It's a real object in front of you, lit by your light, and the game keeps running.
+- **The kill:** both hands come up to shield your face, get shoved aside, and the camcorder falls.
+- **Intro and ending:** you carry the box down the stairs, reach for the wall that isn't there, flail as you fall, and push the exit door open at the end.
+
 ## The map
 
-Press M for Wanderer 7's pencil map. The game keeps running while you read it. It shows the walls you've seen, your trail, every spot where you saw the monster (with how long ago), and a circle where the next note probably is.
+Press M to hold up Wanderer 7's pencil map. The game keeps running while you read it. It shows the walls you've seen, your trail, every spot where you saw the monster (with how long ago), and a circle where the next note probably is.
 
 ## When it catches you
 
@@ -100,3 +112,8 @@ Then open http://localhost:8000.
 
 - `index.html`: the whole game (Three.js r160 from a CDN, no build step)
 - `smily_horror_monster.glb`: the monster's model and skeleton
+
+## Credits
+
+- Monster: "Smily horror monster" (CC BY 4.0), from Sketchfab.
+- Arms: "fps arms" (CC BY 4.0), from Sketchfab.
