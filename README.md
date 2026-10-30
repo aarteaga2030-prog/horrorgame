@@ -68,7 +68,7 @@ Stare at it too long and it forces a burst of flickers and bolts for the nearest
 
 You see your own gloved arms (`fps_arms.glb`), posed live every frame with the same IK system as the monster:
 
-- **Camcorder:** a real camcorder model (`camcorder.glb`) held in your right hand, fingers wrapped around its side. Its flip-out screen shows a live mini feed of what the camera sees, with a REC dot, timecode and battery level. If you walk up against a wall it pulls back toward you instead of poking through.
+- **Camcorder:** a real camcorder model (`camcorder.glb`) cradled in your right hand: palm under it, fingers curling up its right side through the hand strap. Its flip-out screen shows a live mini feed of what the camera sees, with a REC dot, timecode and battery level. If you walk up against a wall it pulls back toward you instead of poking through.
 - **Bob:** your hands and your view bob and sway as you walk, harder when you sprint, and lag a little behind when you turn.
 - **Left hand:** hangs low while walking, pumps as a fist when you sprint, and pulls in when you crouch.
 - **Pickups:** you step in and reach for notes (you hold each one up to read it) and kneel for batteries, which you snap into the camcorder.

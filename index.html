@@ -312,7 +312,7 @@ function vmApply(T){
     const f=t.f.clone().normalize(),sd=t.s.clone();sd.addScaledVector(f,-sd.dot(f)).normalize();
     const qd=new Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(sd,new V3().crossVectors(f,sd),f)).multiply(H.basisInv).multiply(H.wrist.userData.Q0);
     setWorldQ(H.wrist,qd);
-    for(const fg of H.fingers){const c=fg.thumb?t.thumb:t.curl;fg.segs.forEach((sg,k)=>{sg.b.quaternion.copy(_q1.setFromAxisAngle(sg.ax,c*(k===0?.9:1.15))).multiply(sg.b.userData.q0l)})}}
+    H.fingers.forEach((fg,fi)=>{const c=fg.thumb?t.thumb:t.curl*(t.cm?t.cm[fi]:1);fg.segs.forEach((sg,k)=>{sg.b.quaternion.copy(_q1.setFromAxisAngle(sg.ax,c*(k===0?.9:1.15))).multiply(sg.b.userData.q0l)})})}
   VM.holder.updateMatrixWorld(true)}
 /* ---- camcorder model (scanned), its live LCD and held items ---- */
 function normalizeCamcorder(gltf){
@@ -331,7 +331,7 @@ function normalizeCamcorder(gltf){
   const cnt=new Map();let tot=0;parts.forEach((p,pi)=>{const ix=p.g.index.array;for(let i=0;i<ix.length;i+=3){const r=f(vid[pi][ix[i]]);cnt.set(r,(cnt.get(r)||0)+1);tot++}});
   parts.forEach((p,pi)=>{const ix=p.g.index.array;const out=[];for(let i=0;i<ix.length;i+=3){if(cnt.get(f(vid[pi][ix[i]]))>tot*.015)out.push(ix[i],ix[i+1],ix[i+2])}p.g.setIndex(out)});
   const bb=new THREE.Box3(),tv=new V3();for(const p of parts){const a=p.g.attributes.position;for(const k of new Set(p.g.index.array)){tv.fromBufferAttribute(a,k);bb.expandByPoint(tv)}}
-  const c=bb.getCenter(new V3());const s=.12/(bb.max.z-bb.min.z);
+  const c=bb.getCenter(new V3());const s=.15/(bb.max.z-bb.min.z);
   const m=new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeScale(s,s,s)).multiply(new THREE.Matrix4().makeTranslation(-c.x,-c.y,-c.z));
   const grp=new THREE.Group();
   for(const p of parts){p.g.applyMatrix4(m);p.g.computeVertexNormals();p.g.computeBoundingBox();p.g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({map:p.mat.map,roughness:.55,metalness:.08,side:THREE.DoubleSide});const mesh=new THREE.Mesh(p.g,mat);mesh.frustumCulled=false;grp.add(mesh)}
@@ -380,11 +380,12 @@ const vmBattery=new THREE.Group();{const b=new THREE.Mesh(new THREE.BoxGeometry(
 vmBattery.visible=false;vmScene.add(vmBattery);
 let vmNote={visible:false};
 /* ---- poses ---- */
-const CC_BASE=new V3(.13,-.15,-.3);
-const GRIP_R={p:new V3(.052,-.002,.07),f:new V3(-.05,-.5,-.85),s:new V3(0,.85,-.5),curl:.78,thumb:.25};
-const SUPPORT_L={p:new V3(-.005,-.07,.02),f:new V3(.3,.05,-1),s:new V3(-1,0,0),curl:.35,thumb:.2};
-function inCC(pose,ccp,ccq){return{p:pose.p.clone().applyQuaternion(ccq).add(ccp),f:pose.f.clone().applyQuaternion(ccq),s:pose.s.clone().applyQuaternion(ccq),curl:pose.curl,thumb:pose.thumb}}
-function blendPose(a,b,k){if(k<=0)return a;a.p.lerp(b.p,k);a.f.lerp(b.f,k);a.s.lerp(b.s,k);a.curl=lerp(a.curl,b.curl,k);a.thumb=lerp(a.thumb,b.thumb,k);return a}
+const CC_BASE=new V3(.125,-.135,-.31);
+// palm under the body, fingers curling up the right side through the hand strap
+const GRIP_R={p:new V3(-.044,-.099,.028),f:new V3(.877,.359,-.319),s:new V3(.307,.092,.947),curl:.45,thumb:.05,cm:[.9,1,.4,.3]};
+const SUPPORT_L={p:new V3(-.005,.075,.085),f:new V3(.05,-.12,-1),s:new V3(1,0,0),curl:.55,thumb:.2};
+function inCC(pose,ccp,ccq){return{p:pose.p.clone().applyQuaternion(ccq).add(ccp),f:pose.f.clone().applyQuaternion(ccq),s:pose.s.clone().applyQuaternion(ccq),curl:pose.curl,thumb:pose.thumb,cm:pose.cm&&pose.cm.slice()}}
+function blendPose(a,b,k){if(k<=0)return a;a.p.lerp(b.p,k);a.f.lerp(b.f,k);a.s.lerp(b.s,k);a.curl=lerp(a.curl,b.curl,k);a.thumb=lerp(a.thumb,b.thumb,k);if(a.cm||b.cm)a.cm=[0,1,2,3].map(i=>lerp(a.cm?a.cm[i]:1,b.cm?b.cm[i]:1,k));return a}
 function vmOnFlick(){if(G.state!=='play'||!VM.ready)return;const dP=MON.visible?Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z):99;
   if(dP<9&&VM.slapCool<=0&&!VM.reach&&!G.mapOpen&&rnd()<.55){VM.slap={t:0};VM.slapCool=2.2}}
 function vmReach(worldPos,fn,kind){if(!VM.ready||VM.reach){fn('grab');fn('use');return}
@@ -433,7 +434,7 @@ function vmUpdate(dt){
   const wantMap=mode==='play'&&G.mapOpen;VM.mapK=damp(VM.mapK,wantMap?1:0,9,dt);
   // ---- camcorder pose
   const cc=CC_BASE.clone().add(bob);cc.y-=crouch?.02:0;cc.z+=crouch?.02:0;cc.add(new V3(.02,-.05,.11).multiplyScalar(VM.retract));
-  const rot=new V3(-.08-VM.jolt*.25-VM.press*.06+VM.mapK*.15-VM.retract*.35,.18+VM.retract*.3,bobRoll+(run?Math.sin(gp)*.05:0));
+  const rot=new V3(-.08-VM.jolt*.25-VM.press*.06+VM.mapK*.15-VM.retract*.35,.18+VM.retract*.3,-.22+bobRoll+(run?Math.sin(gp)*.05:0));
   cc.y-=VM.jolt*.02;cc.addScaledVector(new V3(.025,-.05,.03),VM.mapK);
   const qccT=new Q().setFromEuler(new THREE.Euler(rot.x,rot.y,rot.z));
   // ---- left hand default
@@ -456,7 +457,7 @@ function vmUpdate(dt){
   if(mode==='box'||mode==='push'||mode==='walk'){VM.ccPos.snap(cc);VM.ccQ.copy(qccT)}
   VM.cc.position.copy(VM.ccPos.x);VM.cc.quaternion.copy(VM.ccQ);
   // ---- right hand: always on the camcorder grip
-  const Rr=Object.assign(inCC(GRIP_R,VM.ccPos.x,VM.ccQ),{pole:new V3(1,-.7,.5)});Rr.thumb+=VM.press*.9;
+  const Rr=Object.assign(inCC(GRIP_R,VM.ccPos.x,VM.ccQ),{pole:new V3(1,-.7,.5)});if(VM.press>0){Rr.cm=Rr.cm.slice();Rr.cm[0]-=Math.sin(Math.min(1,VM.press)*Math.PI)*1.1}
   // ---- reach for a pickup: grab it, then bring it where it goes
   vmBattery.visible=false;vmNote.visible=false;
   VM.dip=0;VM.dipP=0;
@@ -470,7 +471,7 @@ function vmUpdate(dt){
     if(r.t<.32){blendPose(L,grabP,ease(r.t/.32))}
     else if(!r.grabbed){r.grabbed=true;blendPose(L,grabP,1);r.fn&&r.fn('grab')}
     if(r.grabbed){
-      if(r.kind==='battery'){const slot=inCC({p:new V3(0,-.004,.085),f:new V3(0,-.2,-1),s:new V3(1,0,0),curl:.85,thumb:.5},VM.ccPos.x,VM.ccQ);
+      if(r.kind==='battery'){const slot=inCC({p:new V3(0,-.005,.105),f:new V3(0,-.2,-1),s:new V3(1,0,0),curl:.85,thumb:.5},VM.ccPos.x,VM.ccQ);
         const u=r.t-.32;if(u<.38){blendPose(L,grabP,1);blendPose(L,slot,ease(u/.38));vmBattery.visible=true}else if(u<.5){blendPose(L,slot,1);vmBattery.visible=u<.44;if(!r.fired){r.fired=true;VM.jolt=.6;r.fn&&r.fn('use')}}else{const k=ease((u-.5)/.4);blendPose(L,slot,1-k);if(u>.9)VM.reach=null}}
       else{const read={p:new V3(-.07,-.06,-.3),f:new V3(.1,1,.12),s:new V3(-1,0,0),curl:.25,thumb:.15};const u=r.t-.32;
         if(u<.32){blendPose(L,grabP,1);blendPose(L,read,ease(u/.32));vmNote.visible=true}
@@ -478,7 +479,7 @@ function vmUpdate(dt){
           if(!G.paused){r.down=(r.down||0)+dt;const k=ease(r.down/.35);blendPose(L,idle,k);L.p.y-=k*.1;if(r.down>.35){VM.reach=null;vmNote.visible=false}}}}}}
   // slap the camcorder when the light flickers near it
   if(VM.slap){const sl=VM.slap;sl.t+=dt;const u=sl.t/.34;const k=u<.42?ease(u/.42):1-ease((u-.48)/.52);
-    blendPose(L,inCC({p:new V3(-.006,.062,.005),f:new V3(1,-.25,-.2),s:new V3(0,0,1),curl:.1,thumb:0},VM.ccPos.x,VM.ccQ),k);
+    blendPose(L,inCC({p:new V3(-.006,.072,.005),f:new V3(1,-.25,-.2),s:new V3(0,0,1),curl:.1,thumb:0},VM.ccPos.x,VM.ccQ),k);
     if(u>.42&&!sl.hit){sl.hit=true;VM.jolt=1;hiss(master,{ft:'lowpass',f:500,v:.18,d:.06})}if(u>=1)VM.slap=null}
   // ---- special modes
   if(mode==='pickup'){const u=INTRO.t-8.8;
@@ -506,7 +507,8 @@ function vmUpdate(dt){
   const stiff=mode==='kill'?900:mode==='box'||mode==='push'?260:VM.reach||VM.slap?520:mode==='pickup'?300:240;
   const nsub=Math.max(1,Math.ceil(dt*120)),sd=dt/nsub;for(let i=0;i<nsub;i++){VM.S.L.step(L.p,stiff,sd);VM.S.R.step(Rr.p,mode==='play'||mode==='walk'?2000:stiff*1.6,sd);for(const[s,t]of[['L',L],['R',Rr]]){VM.C[s].c.step(t.curl,mode==='kill'?500:160,sd);VM.C[s].t.step(t.thumb,200,sd)}}
   for(const[s,t]of[['L',L],['R',Rr]]){const D=VM.D[s];const r=s==='R'&&(mode==='play'||mode==='walk')?40:16;D.f.lerp(t.f.clone().normalize(),1-Math.exp(-dt*r)).normalize();D.s.lerp(t.s.clone().normalize(),1-Math.exp(-dt*r)).normalize()}
-  vmApply({L:{p:VM.S.L.x,f:VM.D.L.f,s:VM.D.L.s,curl:VM.C.L.c.x,thumb:VM.C.L.t.x,pole:L.pole},R:{p:VM.S.R.x,f:VM.D.R.f,s:VM.D.R.s,curl:VM.C.R.c.x,thumb:VM.C.R.t.x,pole:Rr.pole||new V3(1,-.7,.5)}});
+  VM.cmR=VM.cmR||[1,1,1,1];{const tc=Rr.cm||[1,1,1,1];for(let i=0;i<4;i++)VM.cmR[i]+=(tc[i]-VM.cmR[i])*Math.min(1,dt*10)}
+  vmApply({L:{p:VM.S.L.x,f:VM.D.L.f,s:VM.D.L.s,curl:VM.C.L.c.x,thumb:VM.C.L.t.x,pole:L.pole},R:{p:VM.S.R.x,f:VM.D.R.f,s:VM.D.R.s,curl:VM.C.R.c.x,thumb:VM.C.R.t.x,cm:VM.cmR,pole:Rr.pole||new V3(1,-.7,.5)}});
   // held items sit in the left palm
   if(vmBattery.visible||vmNote.visible){const H=VM.hands.L;const wp=H.wrist.getWorldPosition(new V3());const f=VM.D.L.f,s=VM.D.L.s;const palm=new V3().crossVectors(f,s).normalize().negate();
     if(vmBattery.visible){vmBattery.position.copy(wp).addScaledVector(f,.07).addScaledVector(palm,.03);vmBattery.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s,palm,f))}
@@ -1987,7 +1989,7 @@ function runSim(tune,type,secs){
   return{res,t:+t.toFixed(1),notes:G.notes}}
 const TUNE0=Object.assign({},TUNE);
 if(DEBUG){window.__runSim=runSim;window.__TUNE=TUNE;window.__TUNE0=TUNE0}
-if(DEBUG){window.__batts=()=>batts;window.__lcdStat=()=>{const b=new Uint8Array(256*176*4);renderer.readRenderTargetPixels(lcdRT,0,0,256,176,b);let m=0,mx=0;for(let i=0;i<b.length;i+=4){const v=b[i]+b[i+1]+b[i+2];m+=v;if(v>mx)mx=v}return{avg:m/(b.length/4)/3,max:mx/3,on:VM.lcdOn,map:!!VM.lcd&&!!VM.lcd.scr.material.map,col:VM.lcd&&VM.lcd.scr.material.color.getHexString()}};window.__kill=()=>kill();window.__vmDbg=()=>({vis:VM.holder.visible,cc:VM.cc.visible,mode:vmVisibleState(),L:VM.S.L.x.toArray(),R:VM.S.R.x.toArray(),st:G.state,it:INTRO.t});window.__INTRO_T=()=>INTRO.t;window.__END_T=()=>END.t;window.__startEnding=()=>startEnding();window.__vmSide=(pos,look)=>{const c=new THREE.PerspectiveCamera(50,1.6,.01,10);c.position.set(...pos);c.lookAt(new V3(...look));const bg=vmScene.background;vmScene.background=new THREE.Color(0x556070);const h=vmHemi.intensity;vmHemi.intensity=1.2;
+if(DEBUG){window.__batts=()=>batts;window.__handDims=()=>{const H=VM.hands.R;const P=b=>b.getWorldPosition(new V3());return{lu:H.lu,lf:H.lf,palm:P(H.wrist).distanceTo(P(H.fingers[1].segs[0].b)),fl:P(H.fingers[1].segs[0].b).distanceTo(P(H.fingers[1].segs[2].b)),fing:H.fingers.map(f=>f.segs.map(s=>s.b.name).join('/'))}};window.__handCC=()=>{const H=VM.hands.R;const inv=VM.cc.matrixWorld.clone().invert();const P=b=>b.getWorldPosition(new V3()).applyMatrix4(inv).toArray().map(x=>+x.toFixed(3));const r={wrist:P(H.wrist)};H.fingers.forEach((f,i)=>{r['f'+i]=f.segs.map(sg=>P(sg.b))});return r};window.__gripCM=a=>{GRIP_R.cm=a};window.__grip=o=>{for(const k in o)GRIP_R[k]=Array.isArray(o[k])?new V3(...o[k]):o[k]};window.__ccIso=(views)=>{const sc=new THREE.Scene();sc.background=new THREE.Color(0x556070);sc.add(new THREE.HemisphereLight(0xffffff,0x444444,2.5));const g=CCMODEL.grp.clone();sc.add(g);sc.add(new THREE.AxesHelper(.08));const out=[];for(const v of views){const c=new THREE.PerspectiveCamera(40,1.6,.005,5);c.position.set(...v);c.lookAt(0,0,0);renderer.setRenderTarget(null);renderer.render(sc,c);out.push(renderer.domElement.toDataURL('image/jpeg',.85))}const P=[];g.traverse(o=>{if(o.isMesh&&o.geometry.index){const A=o.geometry.attributes.position;for(const k of new Set(o.geometry.index.array))P.push([A.getX(k),A.getY(k),A.getZ(k)])}});window.__ccPts=P;return{out,box:[CCMODEL.box.min.toArray(),CCMODEL.box.max.toArray()],lcd:CCMODEL.lcd&&CCMODEL.lcd.center.toArray()}};window.__lcdStat=()=>{const b=new Uint8Array(256*176*4);renderer.readRenderTargetPixels(lcdRT,0,0,256,176,b);let m=0,mx=0;for(let i=0;i<b.length;i+=4){const v=b[i]+b[i+1]+b[i+2];m+=v;if(v>mx)mx=v}return{avg:m/(b.length/4)/3,max:mx/3,on:VM.lcdOn,map:!!VM.lcd&&!!VM.lcd.scr.material.map,col:VM.lcd&&VM.lcd.scr.material.color.getHexString()}};window.__kill=()=>kill();window.__vmDbg=()=>({vis:VM.holder.visible,cc:VM.cc.visible,mode:vmVisibleState(),L:VM.S.L.x.toArray(),R:VM.S.R.x.toArray(),st:G.state,it:INTRO.t});window.__INTRO_T=()=>INTRO.t;window.__END_T=()=>END.t;window.__startEnding=()=>startEnding();window.__vmSide=(pos,look)=>{const c=new THREE.PerspectiveCamera(50,1.6,.01,10);c.position.set(...pos);c.lookAt(new V3(...look));const bg=vmScene.background;vmScene.background=new THREE.Color(0x556070);const h=vmHemi.intensity;vmHemi.intensity=1.2;
   const cam0=new THREE.Mesh(new THREE.ConeGeometry(.03,.08,8),new THREE.MeshBasicMaterial({color:0xff0000}));cam0.rotation.x=-Math.PI/2;vmScene.add(cam0);
   renderer.setRenderTarget(null);renderer.render(vmScene,c);const d=renderer.domElement.toDataURL('image/jpeg',.85);vmScene.remove(cam0);vmScene.background=bg;vmHemi.intensity=h;return d};window.__vmShot=(setup,secs)=>{setup&&setup({G,VM,player,V3,INTRO,END,keys});const dt=1/30;for(let i=0;i<Math.round((secs||1)/dt);i++){if(G.state==='play'&&!G.paused){updatePlayer(dt)}if(G.state==='dying'){G.scareT+=dt;updateGrab(dt)}if(G.state==='intro')updateIntro(dt);if(G.state==='ending')updateEnding(dt);if(G.state==='play'||G.state==='dying'){placeCamera(dt)};camera.updateMatrixWorld();updateLights(dt);vmUpdate(dt);if(CR&&MON.visible&&G.state==='dying'&&computePose(dt))CR.apply(POSE)}{const nr=window.__noRender;window.__noRender=false;lcdSkip=1;renderLCD(dt);window.__noRender=nr}composer.render(dt);return renderer.domElement.toDataURL('image/jpeg',.85)};window.__lvlStats=()=>({doors:hD.reduce((a,b)=>a+b,0)+vD.reduce((a,b)=>a+b,0),pillars:pillars.length,props:levelGroup.children.length,batts:batts.length});window.__skipIntro=()=>{if(G.state==='intro')finishIntro()};window.__intro=(t)=>{if(G.state!=='intro')startIntro();const dt=1/30;while(INTRO.t<t&&G.state==='intro'){updateIntro(dt);updateLights(dt);if(CR&&MON.visible&&!INTRO.monFrozen&&computePose(dt))CR.apply(POSE)}composer.render(dt);return G.state==='intro'?renderer.domElement.toDataURL('image/jpeg',.85):'done:'+G.state};window.__ending=(t)=>{if(G.state!=='ending'){startEnding()}const dt=1/30;while(END.t<t&&G.state==='ending')updateEnding(dt);composer.render(dt);return G.state==='ending'?renderer.domElement.toDataURL('image/jpeg',.85):'done'};window.__BRAIN=BRAIN;window.__BR=BR;window.__toggleMap=toggleMap;window.__los=losXZ;window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
   window.__force=(ev)=>{const f={stare:()=>spawnStare(10,22,false)||spawnStare(10,22,true),peek:spawnPeek,cross:spawnCross,behind:spawnBehind}[ev];return f?f():false};
