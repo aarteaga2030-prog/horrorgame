@@ -629,7 +629,9 @@ const H={turnL:0,turnR:0,behind:0,playT:0,stareSum:0,stareN:0,runT:0,lightOffT:0
 try{const j=JSON.parse(localStorage.getItem(HKEY)||'null');if(j)Object.assign(H,j)}catch(e){}
 function saveH(){try{localStorage.setItem(HKEY,JSON.stringify(H))}catch(e){}}
 let prevYaw=null,yawHist=[],behindCool=0,saveT=5;const told={};
-function trackHabits(dt,run){
+function trackHide(dt){const still=Math.hypot(player.vx||0,player.vz||0)<.3;const hiding=still&&(!G.light||G.crouch);
+  G.hideT=hiding?(G.hideT||0)+dt:0;if(G.hideT>4){G.hideT=-30;const[cx,cy]=cellOf(player.x,player.z);G.hides=G.hides||[];if(!G.hides.some(h=>h.c===cy*GW+cx)){G.hides.push({c:cy*GW+cx,t:G.time});if(G.hides.length>8)G.hides.shift()}}}
+function trackHabits(dt,run){trackHide(dt);
   H.playT+=dt;if(run)H.runT+=dt;if(!G.light)H.lightOffT+=dt;
   if(prevYaw!=null){const d=angDiff(prevYaw,player.yaw);if(d>.002)H.turnL+=d;else if(d<-.002)H.turnR-=d;
     yawHist.push({t:G.time,d});while(yawHist.length&&G.time-yawHist[0].t>1.3)yawHist.shift();
@@ -643,12 +645,22 @@ function playerFwd(){return new V3(-Math.sin(player.yaw),0,-Math.cos(player.yaw)
 // score bonus for approaching from the side the player checks least, and from behind if they rarely look back
 function blindBonus(vx,vz){const hb=habits();const L=playerLeft(),F=playerFwd();const left=vx*L.x+vz*L.z,back=-(vx*F.x+vz*F.z);
   return -left*hb.leftBias*2+back*(hb.behindRate<1.2?1.2:hb.behindRate>4?-.4:.4)}
+const TACTICS=['hunt','flank','ambush','lurk','guard','decoy','herd'];
+if(!H.tac)H.tac={};TACTICS.forEach(t=>{if(!H.tac[t])H.tac[t]={a:1,b:1}});
+function betaSample(a,b){const g=k=>{if(k<1){return g(k+1)*Math.pow(rnd(),1/k)}const d=k-1/3,c=1/Math.sqrt(9*d);for(;;){let x,v;do{const u1=rnd(),u2=rnd();x=Math.sqrt(-2*Math.log(u1+1e-12))*Math.cos(6.283*u2);v=1+c*x}while(v<=0);v=v*v*v;const u=rnd();if(u<1-.0331*x*x*x*x)return d*v;if(Math.log(u)<.5*x*x+d*(1-v+Math.log(v)))return d*v}};const x=g(a),y=g(b);return x/(x+y)}
+function tacBonus(t){const s=H.tac[t];return s?(betaSample(s.a,s.b)-.5)*TUNE.learn:0}
+function reward(t,r,w){const s=H.tac[t];if(!s)return;w=w||1;s.a+=r*w;s.b+=(1-r)*w;const tot=s.a+s.b;if(tot>60){s.a*=60/tot;s.b*=60/tot}saveH()}
+function recentTactics(sec){return (BRAIN.hist||[]).filter(h=>G.time-h.t<sec&&TACTICS.includes(h.a)).slice(-2)}
+function tacLines(){const out=[];const names={hunt:'hunting you down',flank:'coming around the side',ambush:'waiting at corners',lurk:'standing in the dark for you to find',guard:'waiting where you need to go',decoy:'fake footsteps',herd:'driving you into dead ends'};
+  let best=null,bm=0,worst=null,wm=1;for(const t of TACTICS){const s=H.tac[t],n=s.a+s.b-2,m=s.a/(s.a+s.b);if(n<2.5)continue;if(m>bm){bm=m;best=t}if(m<wm){wm=m;worst=t}}
+  if(best&&bm>.55)out.push(`${names[best]} works on you`);if(worst&&wm<.3&&worst!==best)out.push(`${names[worst]} doesn't`);return out}
 function habitLines(){const hb=habits(),out=[];
   if(Math.abs(hb.leftBias)>.2)out.push(`you always turn ${hb.leftBias>0?'left':'right'} first`);
   if(hb.behindRate<1.2)out.push('you almost never look behind you');else if(hb.behindRate>4)out.push('you check behind you, so it comes from the side');
   if(H.stareN>=3)out.push(`you hold the light on it for about ${hb.stare.toFixed(1)} seconds`);
   if(hb.runFrac>.35)out.push('you run a lot, and it can hear you');
   if(hb.lightOffFrac>.15)out.push('you hide in the dark, so it listens harder');
+  out.push(...tacLines());
   return out}
 function maybeTell(){const hb=habits();
   if(!told.turn&&Math.abs(hb.leftBias)>.3&&H.turnL+H.turnR>40){told.turn=1;caption(`[It has noticed you always turn ${hb.leftBias>0?'left':'right'}.]`);return}
@@ -830,7 +842,7 @@ function updateAIOld(dt){
   if(MON.visible&&dP<6&&rnd()<dt*1.2)flickerNear();
 }
 function farCell(){let best=null,bd=0;for(let t=0;t<60;t++){const x=rnd()*GW|0,y=rnd()*GH|0;const cx=(x+.5)*CS,cz=(y+.5)*CS,d=Math.hypot(cx-player.x,cz-player.z);if(d>bd){bd=d;best=new V3(cx,0,cz)}}return best}
-function kill(){if(G.state!=='play')return;saveH();beginKill();G.state='dying';G.scareT=0;setAI('grab');$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
+function kill(){if(G.state!=='play')return;{const r=recentTactics(25);if(r.length){reward(r[r.length-1].a,1,1);if(r.length>1)reward(r[0].a,1,.5)}}saveH();beginKill();G.state='dying';G.scareT=0;setAI('grab');$('hud').hidden=true;$('noteWrap').hidden=true;$('mapWrap').hidden=true;unlock()}
 function findFlank(dmin,dmax,behindPref){
   const[mx,my]=cellOf(MON.pos.x,MON.pos.z);const f=cellBFS(mx,my);
   const fw=new V3(0,0,-1).applyQuaternion(camera.quaternion);fw.y=0;fw.normalize();
@@ -919,7 +931,7 @@ function updateAIStalk(dt){
     if(AI.hold>0){AI.hold-=dt;stopMove(dt);faceTo(player.x,player.z,dt,1);break}
     if(AI.wait>0&&!flick){AI.wait-=dt;stopMove(dt);faceTo(player.x,player.z,dt,2);I.tilt=.9;break}
     let sp;
-    if(flick)sp=AI.dash?(crawl?11:9):(crawl?9:7.2);
+    if(flick)sp=AI.dash?(crawl?TUNE.lurchC*1.22:TUNE.lurchW*1.25):(crawl?TUNE.lurchC:TUNE.lurchW);
     else if(inV)sp=crawl?3.6:2.8;
     else{sp=(crawl?4.3:2.5)+a*.9+(G.exitOpen?.8:0);if(AI.mode!=='flank')sp=Math.min(sp,1.3+dP*.4)}
     if(AI.mode==='flank'&&AI.goal)navTo(AI.goal.x,AI.goal.z,sp,dt);else{const lead=dP>3?Math.min(1.2,dP/6):0;const tx=player.x+(player.vx||0)*lead,tz=player.z+(player.vz||0)*lead;navTo(losXZ(player.x,player.z,tx,tz)?tx:player.x,losXZ(player.x,player.z,tx,tz)?tz:player.z,sp,dt)}
@@ -942,13 +954,14 @@ function beginKill(){K.yaw0=player.yaw;K.pitch0=player.pitch;K.y0=player.y;const
    what it can hear (running, walking) and the habits it has learned. Every few tenths of a second it scores its options
    (search, hunt, flank, ambush, lurk, retreat) and commits to the best one, with hysteresis so it doesn't dither.
    It still cannot move while your beam is on it; it plans while frozen and acts in the flickers. */
+const TUNE={hunt:0.155,flank:0.223,ambush:0.426,lurk:0.744,guard:0.505,decoy:0.579,herd:0.463,spHunt:5.259,spFlank:5.5,lurchW:7.509,lurchC:7.874,flick:1.7,stareK:0.35,menace:0.037,backoff:5.775,creep:0.43,learn:.4}; // trained by self-play against bot players
 const BR={x:0,z:0,vx:0,vz:0,conf:0,t:-99};
 const BRAIN={action:null,goal:null,think:0,actT:0,menace:0,backoffT:0,lurkCool:25,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,unseenT:0,lostSaid:false,visited:null,seenAtLurk:0};
 function brainReset(grace){
   const[pcx,pcy]=cellOf(player.x,player.z);const f=cellBFS(pcx,pcy);let maxd=0;for(let i=0;i<GW*GH;i++)if(f[i]>maxd)maxd=f[i];
   const far=[];for(let i=0;i<GW*GH;i++)if(f[i]>=Math.max(9,maxd*.6))far.push(i);const c=far.length?pick(far):0;
   resetIntent();placeMonster((c%GW+.5)*CS,((c/GW|0)+.5)*CS,rnd()*6.28,1);showMonster();setAI('brain');
-  Object.assign(BRAIN,{decoyCool:20,silentT:0,forceFlank:0,action:null,goal:null,think:0,actT:0,menace:0,backoffT:grace||0,lurkCool:12,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,lostSaid:false,seenAtLurk:0});
+  Object.assign(BRAIN,{herdCool:10,hist:[],engaged:0,nearT:0,decoyCool:20,silentT:0,forceFlank:0,action:null,goal:null,think:0,actT:0,menace:0,backoffT:grace||0,lurkCool:12,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,lostSaid:false,seenAtLurk:0});
   BRAIN.visited=new Float32Array(GW*GH).fill(-99);
   BR.x=player.x+(rnd()-.5)*CS*6;BR.z=player.z+(rnd()-.5)*CS*6;BR.vx=BR.vz=0;BR.conf=.3;BR.t=G.time;AI.style='walk';AI.styleT=3;AI.dash=false;
 }
@@ -966,9 +979,10 @@ function sense(dt,dP){
 }
 function mcellField(){const[mx,my]=cellOf(MON.pos.x,MON.pos.z);return cellBFS(mx,my)}
 function searchGoal(){
+  if(G.hides&&G.hides.length&&BR.conf<.3&&rnd()<.5){const h=pick(G.hides);if(G.time-BRAIN.visited[h.c]>40){const x=h.c%GW,y=(h.c/GW)|0;if(mcellField()[h.c]>=0)return{x:(x+.5)*CS,z:(y+.5)*CS,cell:h.c}}}
   const age=G.time-BR.t,r=clamp(2+age*.12,2,9);const[bx,by]=cellOf(BR.x,BR.z);const f=mcellField();let best=null,bs=-1e9;
   for(let y=Math.floor(by-r);y<=by+r;y++)for(let x=Math.floor(bx-r);x<=bx+r;x++){if(!inCell(x,y))continue;const i=y*GW+x;if(f[i]<0)continue;const dd=Math.hypot(x-bx,y-by);if(dd>r)continue;
-    const sc=Math.min(2.5,(G.heat?G.heat[i]:0)*.08)-dd*.22-(G.time-BRAIN.visited[i]<45?2.2:0)-f[i]*.04+rnd()*1.2;if(sc>bs){bs=sc;best={x:(x+.5)*CS,z:(y+.5)*CS,cell:i}}}
+    const sc=Math.min(2.5,(G.heat?G.heat[i]:0)*.08)+(G.hides&&G.hides.some(h=>h.c===i)?3:0)-dd*.22-(G.time-BRAIN.visited[i]<45?2.2:0)-f[i]*.04+rnd()*1.2;if(sc>bs){bs=sc;best={x:(x+.5)*CS,z:(y+.5)*CS,cell:i}}}
   return best||{x:BR.x,z:BR.z,cell:-1}}
 function findAmbush(){
   const L=findPeek(4,13,true);if(!L||!L.length)return null;const f=mcellField();const vx=player.vx||0,vz=player.vz||0,sp=Math.hypot(vx,vz)||1;let best=null,bs=-1e9;
@@ -983,6 +997,7 @@ function retreatGoal(){const f=mcellField();const[pcx,pcy]=cellOf(player.x,playe
   return best||farCell()}
 function prefStyle(st,p){AI.style=rnd()<p?st:(st==='walk'?'crawl':'walk');AI.styleT=1.5+rnd()*3}
 function startAction(act,dP){
+  BRAIN.hist=BRAIN.hist||[];if(BRAIN.hist.length>30)BRAIN.hist.shift();BRAIN.hist.push({a:act,t:G.time});
   BRAIN.action=act;BRAIN.actT=0;BRAIN.arrived=false;BRAIN.waitT=0;BRAIN.goal=null;BRAIN.peek=null;BRAIN.peekP=0;BRAIN.seenAtLurk=0;AI.spot=null;
   if(act==='search'){BRAIN.goal=searchGoal();prefStyle('walk',.75)}
   else if(act==='hunt'){prefStyle('crawl',.6)}
@@ -992,15 +1007,34 @@ function startAction(act,dP){
   else if(act==='retreat'){BRAIN.goal=retreatGoal();prefStyle('crawl',.8)}
   else if(act==='guard'){const g=guardGoal();if(g){BRAIN.goal=g;prefStyle('crawl',.7)}else{BRAIN.action='hunt'}}
   else if(act==='decoy'){BRAIN.decoyCool=35+rnd()*25;playDecoy(dP)}
+  else if(act==='herd'){const g=herdGoal();BRAIN.herdCool=14;if(g){BRAIN.goal=g;prefStyle('crawl',.75)}else BRAIN.action='hunt'}
 }
+function deadEndNear(){const[pcx,pcy]=cellOf(player.x,player.z);const f=cellBFS(pcx,pcy);let best=null,bd=99;
+  for(let i=0;i<GW*GH;i++){const d=f[i];if(d<2||d>8)continue;const x=i%GW,y=(i/GW)|0;let deg=0;for(const[dx,dy]of D4)if(edgeOpen(x,y,dx,dy))deg++;if(deg===1&&d<bd){bd=d;best={x,y,d,f}}}
+  if(!best)return null;// first step from the player toward the dead end
+  let cx=best.x,cy=best.y;for(let k=0;k<20;k++){let nx=-1,ny=-1;const v=best.f[cy*GW+cx];for(const[dx,dy]of D4){if(!edgeOpen(cx,cy,dx,dy))continue;if(best.f[(cy+dy)*GW+cx+dx]===v-1){nx=cx+dx;ny=cy+dy}}if(nx<0||best.f[ny*GW+nx]===0)break;cx=nx;cy=ny}
+  return{dx:(cx+.5)*CS-player.x,dz:(cy+.5)*CS-player.z,dead:{x:(best.x+.5)*CS,z:(best.y+.5)*CS},d:best.d}}
+function herdGoal(){const de=deadEndNear();if(!de)return null;const l=Math.hypot(de.dx,de.dz)||1;// stand on the opposite side, so you run toward the dead end
+  const f=mcellField();let best=null,bs=-1e9;const ux=-de.dx/l,uz=-de.dz/l;
+  for(let r=2.5;r<=6;r+=.9)for(let a=-.7;a<=.7;a+=.35){const ca=Math.cos(a),sa=Math.sin(a);const x=player.x+(ux*ca-uz*sa)*r,z=player.z+(ux*sa+uz*ca)*r;const c=cellOf(x,z);const pd=f[c[1]*GW+c[0]];if(pd<0||pd>16)continue;
+    const sc=-pd*.12-Math.abs(a)*.5+(losXZ(player.x,player.z,x,z)?-.4:0)+rnd()*.3;if(sc>bs){bs=sc;best={x:(c[0]+.5)*CS,z:(c[1]+.5)*CS}}}
+  return best}
 function objective(){if(G.exitOpen&&exitDoor)return{x:exitDoor.x,z:exitDoor.z};const i=G.hintIdx>=0?G.hintIdx:nearestNote(player.x,player.z);return i>=0&&notes[i]&&!notes[i].taken?{x:notes[i].pos.x,z:notes[i].pos.z}:null}
-function guardGoal(){const o=objective();if(!o)return null;const f=mcellField();const[ox,oy]=cellOf(o.x,o.z);let best=null,bs=-1e9;
+function chokeGoal(){const o=objective();if(!o)return null;const[ox,oy]=cellOf(o.x,o.z);const fo=cellBFS(ox,oy);const[pcx,pcy]=cellOf(player.x,player.z);if(fo[pcy*GW+pcx]<0)return null;
+  // walk the route from the player toward the goal and pick a narrow cell or doorway on it, hidden from the player
+  const route=[];let cx=pcx,cy=pcy;for(let k=0;k<40;k++){const v=fo[cy*GW+cx];if(v<=0)break;let nx=-1,ny=-1;for(const[dx,dy]of D4){if(!edgeOpen(cx,cy,dx,dy))continue;if(fo[(cy+dy)*GW+cx+dx]===v-1){nx=cx+dx;ny=cy+dy;break}}if(nx<0)break;cx=nx;cy=ny;route.push([cx,cy])}
+  const mf=mcellField();let best=null,bs=-1e9;
+  route.forEach(([x,y],i)=>{if(i<3||i>14)return;let deg=0;for(const[dx,dy]of D4)if(edgeOpen(x,y,dx,dy))deg++;const door=(hD[hI(x,y)]||hD[hI(x,y+1)]||vD[vI(x,y)]||vD[vI(x+1,y)])?1:0;
+    const cx2=(x+.5)*CS,cz2=(y+.5)*CS;const pd=mf[y*GW+x];if(pd<0||pd>22)return;const hid=losXZ(player.x,player.z,cx2,cz2)?0:1;
+    const sc=(deg<=2?1:0)+door*.8+hid*1.2-pd*.04-Math.abs(i-7)*.08+rnd()*.4;if(sc>bs){bs=sc;best={x:cx2,z:cz2}}});
+  return best}
+function guardGoal(){const c=rnd()<.7?chokeGoal():null;if(c)return c;const o=objective();if(!o)return null;const f=mcellField();const[ox,oy]=cellOf(o.x,o.z);let best=null,bs=-1e9;
   for(let y=oy-4;y<=oy+4;y++)for(let x=ox-4;x<=ox+4;x++){if(!inCell(x,y))continue;const i=y*GW+x;if(f[i]<0||f[i]>24)continue;const cx=(x+.5)*CS,cz=(y+.5)*CS;if(losXZ(player.x,player.z,cx,cz))continue;
     const sees=losXZ(cx,cz,o.x,o.z)?1.5:0;const d=Math.hypot(cx-o.x,cz-o.z);const sc=sees-Math.abs(d-4)*.3-f[i]*.03+rnd()*.6;if(sc>bs){bs=sc;best={x:cx,z:cz}}}
   return best}
 function playDecoy(dP){if(!AC||!decoyPan){BRAIN.forceFlank=1;return}
   const vx=player.x-MON.pos.x,vz=player.z-MON.pos.z,l=Math.hypot(vx,vz)||1;let fx=player.x+vx/l*6,fz=player.z+vz/l*6;fx=clamp(fx,1,GW*CS-1);fz=clamp(fz,1,GH*CS-1);
-  setPos(decoyPan,fx,.6,fz);for(let i=0;i<5;i++){hiss(decoyBus,{ft:'lowpass',f:220,v:.5,d:.2,delay:i*.42});hiss(decoyBus,{f:700,q:1.2,v:.12,d:.15,delay:i*.42+.02})}
+  setPos(decoyPan,fx,.6,fz);const gap=player.run?.27:.55;for(let i=0;i<6;i++){hiss(decoyBus,{ft:'lowpass',f:320,v:.34,d:.12,delay:i*gap});if(i%2)hiss(decoyBus,{f:900,q:1.5,v:.1,d:.18,delay:i*gap+.03})}
   hiss(decoyBus,{f:900,f2:300,q:2,v:.14,d:.6,a:.12,delay:2.1});BRAIN.silentT=9;
   setTimeout(()=>{if(BRAIN.action==='decoy'){BRAIN.action=null;BRAIN.think=0;BRAIN.forceFlank=1}},2400)}
 function think(dP,lit,inV){
@@ -1010,17 +1044,19 @@ function think(dP,lit,inV){
   else{
     const n=()=>rnd()*.18;
     o.search=.55-conf*.5+n();
-    if(conf>.35)o.hunt=.26+conf*.24+(dP<7?.3:0)+a*.1+n();
-    if(conf>.4&&dP>4.5&&dP<22)o.flank=.3+(inV?.3:0)+(lit?.3:0)+(hb.behindRate<1.2?.08:0)+n();
-    if(conf>.6&&pv>.7&&dP>6&&!inV)o.ambush=.56+a*.1+n();
-    if(conf>.6&&dP>8&&dP<18&&!inV&&G.light&&BRAIN.lurkCool<=0&&!G.exitOpen)o.lurk=.66+n();
-    const obj=objective();if(obj&&conf>.45&&dP>10){const po=Math.hypot(obj.x-player.x,obj.z-player.z);if(po>7&&po<34)o.guard=.48+(G.exitOpen?.4:0)+n()}
-    if(conf>.6&&dP>7&&dP<18&&!inV&&BRAIN.decoyCool<=0)o.decoy=.5+a*.15+n();
+    if(conf>.35)o.hunt=TUNE.hunt+conf*.24+(dP<7?.3:0)+a*.1+n();
+    if(conf>.4&&dP>4.5&&dP<22)o.flank=TUNE.flank+(inV?.3:0)+(lit?.3:0)+(hb.behindRate<1.2?.08:0)+n();
+    if(conf>.6&&pv>.7&&dP>6&&!inV)o.ambush=TUNE.ambush+a*.1+n();
+    if(conf>.7&&dP>3.5&&dP<15&&BRAIN.herdCool<=0)o.herd=TUNE.herd+a*.1+n();
+    if(conf>.6&&dP>8&&dP<18&&!inV&&G.light&&BRAIN.lurkCool<=0&&!G.exitOpen)o.lurk=TUNE.lurk+n();
+    const obj=objective();if(obj&&conf>.45&&dP>10){const po=Math.hypot(obj.x-player.x,obj.z-player.z);if(po>7&&po<34)o.guard=TUNE.guard+(G.exitOpen?.4:0)+n()}
+    if(conf>.6&&dP>7&&dP<18&&!inV&&BRAIN.decoyCool<=0)o.decoy=TUNE.decoy+a*.15+n();
     if(G.batt<25&&o.hunt)o.hunt+=.2;
-    if(G.exitOpen){delete o.search;o.hunt=(o.hunt||.5)+.3}}
+    if(G.exitOpen){delete o.search;o.hunt=(o.hunt||.5)+.3}
+    for(const k in o)if(TACTICS.includes(k))o[k]+=tacBonus(k)}
   let best=null,bv=-1;for(const k in o)if(o[k]>bv){bv=o[k];best=k}
   const cur=BRAIN.action;
-  const busy=(cur==='guard'&&BRAIN.arrived&&BRAIN.actT<30&&dP>8)||(cur==='decoy'&&BRAIN.actT<2.4)||(cur==='ambush'&&BRAIN.arrived&&BRAIN.actT<16)||(cur==='lurk'&&BRAIN.actT<25)||(cur==='retreat'&&BRAIN.backoffT>0);
+  const busy=(cur==='herd'&&!BRAIN.arrived&&BRAIN.actT<6)||(cur==='guard'&&BRAIN.arrived&&BRAIN.actT<30&&dP>8)||(cur==='decoy'&&BRAIN.actT<2.4)||(cur==='ambush'&&BRAIN.arrived&&BRAIN.actT<16)||(cur==='lurk'&&BRAIN.actT<25)||(cur==='retreat'&&BRAIN.backoffT>0);
   if(cur&&o[cur]!==undefined&&(busy||(o[cur]+.15>=bv&&BRAIN.actT<9)))best=cur;
   if(best!==cur||(!BRAIN.goal&&best!=='hunt'))startAction(best,dP);
 }
@@ -1031,20 +1067,25 @@ function updateAI(dt){
   // stare + flicker bookkeeping
   AI.litStreak=lit?(AI.litStreak||0)+dt:Math.max(0,(AI.litStreak||0)-dt*.5);
   if(inV){AI.watchT=(AI.watchT||0)+dt;AI.watchGap=0}else{AI.watchGap=(AI.watchGap||0)+dt;if(AI.watchGap>.5&&AI.watchT>.4){H.stareSum+=Math.min(15,AI.watchT);H.stareN++;AI.watchT=0}else if(AI.watchGap>.5)AI.watchT=0}
-  G.flickRate=(dP<15?(1-dP/15)*(1.25+G.notes*.22+(G.exitOpen?1.1:0)):.05)+(lit?Math.min(2.2,.35+AI.litStreak*.55):0);
+  G.flickRate=(dP<15?(1-dP/15)*(TUNE.flick+G.notes*.22+(G.exitOpen?1.1:0)):.05)+(lit?Math.min(2.2,.35+AI.litStreak*.55):0);
   if(lit&&!AI.wasLit){if(AI.moved>.35&&dP<8){SND.sting();G.glitch=.7;if(dP<4)caption(pick(['[It is closer.]','[Don\'t blink.]','[Keep the light on it.]']))}AI.moved=0}
   AI.wasLit=lit;
   if(lit&&!BRAIN.sightRec){BRAIN.sightRec=true;G.sights.push({x:MON.pos.x,z:MON.pos.z,t:G.time});if(G.sights.length>10)G.sights.shift()}
   if(!inV){BRAIN.unseenT+=dt;if(BRAIN.unseenT>3)BRAIN.sightRec=false}else BRAIN.unseenT=0;
   AI.tellT=(AI.tellT||20)-dt;if(AI.tellT<=0){AI.tellT=25;maybeTell()}
+  {const prevConf=BRAIN.prevConf||0;
+    if(dP<2.2&&BRAIN.nearT<=0){BRAIN.nearT=15;const r=recentTactics(15);if(r.length)reward(r[r.length-1].a,.6,.6)}BRAIN.nearT-=dt;
+    if(BR.conf>.8&&dP<10)BRAIN.engaged=G.time;
+    if(prevConf>.6&&BR.conf<.3&&G.time-BRAIN.engaged<12){const r=recentTactics(20);if(r.length)reward(r[r.length-1].a,0,.8);BRAIN.engaged=-99}
+    BRAIN.prevConf=BR.conf}
   sense(dt,dP);
   // director: if it has been on top of you too long, it backs off for a while
-  BRAIN.menace=clamp(BRAIN.menace+dt*(dP<10?(inV?.045:.018)*(1.5-dP/10):-.05),0,1);BRAIN.decoyCool-=dt;BRAIN.silentT-=dt;BRAIN.dangerT=(BRAIN.dangerT||0)-dt;if(BRAIN.dangerT<=0){BRAIN.dangerT=.4;updateDanger()}
+  BRAIN.menace=clamp(BRAIN.menace+dt*(dP<10?(inV?TUNE.menace:TUNE.menace*.4)*(1.5-dP/10):-.05),0,1);BRAIN.decoyCool-=dt;BRAIN.herdCool-=dt;BRAIN.silentT-=dt;BRAIN.dangerT=(BRAIN.dangerT||0)-dt;if(BRAIN.dangerT<=0){BRAIN.dangerT=.4;updateDanger()}
   BRAIN.backoffT-=dt;BRAIN.lurkCool-=dt;
-  if(BRAIN.menace>.97&&BRAIN.backoffT<=0&&!G.exitOpen){BRAIN.backoffT=5+rnd()*4;BRAIN.menace=.5;BRAIN.think=0}
+  if(BRAIN.menace>.97&&BRAIN.backoffT<=0&&!G.exitOpen){BRAIN.backoffT=TUNE.backoff+rnd()*4;BRAIN.menace=.5;BRAIN.think=0}
   BRAIN.actT+=dt;BRAIN.think-=dt;if(BRAIN.think<=0){BRAIN.think=lit?.25:.4;think(dP,lit,inV)}
   // stared at too long: burst of flickers and a dash to cover
-  const flick=G.light&&G.flickOff>0;const stareLimit=clamp(habits().stare*.55,.7,2.2);
+  const flick=G.light&&G.flickOff>0;const stareLimit=clamp(habits().stare*TUNE.stareK,.7,2.2);
   if(lit&&AI.litStreak>stareLimit&&!AI.dash){const c=findCoverNear();AI.dash=true;if(c){BRAIN.action='flank';BRAIN.goal=c;BRAIN.actT=0;BRAIN.arrived=false;AI.lastAng=c.ang;if(rnd()<.6)AI.style='crawl';forceFlicks(3+(rnd()*2|0))}else forceFlicks(2)}
   if(AI.dash&&!lit&&!inV){AI.dash=false;AI.litStreak=0}
   AI.styleT=(AI.styleT==null?2:AI.styleT)-dt;if(AI.styleT<=0&&!(BRAIN.arrived&&(BRAIN.action==='ambush'||BRAIN.action==='lurk'))){AI.style=AI.style==='walk'?'crawl':'walk';AI.styleT=1.6+rnd()*3.4;if(dP<12&&rnd()<.5)SND.click()}
@@ -1055,13 +1096,13 @@ function updateAI(dt){
   const act=BRAIN.action||'search',crawl=G.exitOpen||AI.style==='crawl';
   I.stand=crawl?0:1;I.hunch=.5;I.limp=!crawl;I.jaw=dP<5?1:.4;I.armsUp=!crawl&&dP<5?clamp((5.5-dP)/3,0,1):0;I.tilt=.35+Math.sin(AI.t*.9)*.45;AI.t+=dt;
   let tx=player.x,tz=player.z,sp;
-  if(act==='hunt'){const lead=dP>3?Math.min(1.2,dP/6):0;tx=BR.x+BR.vx*lead;tz=BR.z+BR.vz*lead;if(!losXZ(BR.x,BR.z,tx,tz)){tx=BR.x;tz=BR.z}sp=crawl?4.5:2.7}
-  else if(BRAIN.goal){tx=BRAIN.goal.x;tz=BRAIN.goal.z;sp=act==='search'?(crawl?2.8:1.45):act==='retreat'?(crawl?4.6:2.7):(crawl?4.7:2.8)}
+  if(act==='hunt'){const lead=dP>3?Math.min(1.2,dP/6):0;tx=BR.x+BR.vx*lead;tz=BR.z+BR.vz*lead;if(!losXZ(BR.x,BR.z,tx,tz)){tx=BR.x;tz=BR.z}sp=crawl?TUNE.spHunt:TUNE.spHunt*.6}
+  else if(BRAIN.goal){tx=BRAIN.goal.x;tz=BRAIN.goal.z;sp=act==='search'?(crawl?2.8:1.45):act==='retreat'?(crawl?4.6:2.7):(crawl?TUNE.spFlank:TUNE.spFlank*.6)}
   else sp=1.5;
   sp+=a*.6+(G.exitOpen?.8:0);
   if(inV&&!flick)sp=Math.min(sp,crawl?3.4:2.6);
   if(flick)sp=AI.dash?(crawl?11:9):(crawl?9:7.2);
-  else if(!inV&&act==='hunt'&&dP<6&&dP>1.6)sp=Math.min(sp,1.3+dP*.42);
+  else if(!inV&&act==='hunt'&&dP<6&&dP>1.6)sp=Math.min(sp,1.3+dP*TUNE.creep);
   if(dP<1.6&&!inV)sp=5.5;
   const dGoal=Math.hypot(tx-MON.pos.x,tz-MON.pos.z);
   if(act==='decoy'){BRAIN.arrived=true}
@@ -1087,6 +1128,7 @@ function updateAI(dt){
     else if(act==='retreat'){faceTo(player.x,player.z,dt,1);if(BRAIN.backoffT<=0)BRAIN.action=null}
     else if(act==='guard'){const o=objective();if(o)faceTo(o.x,o.z,dt,1);I.stand=AI.style==='crawl'?0:1;I.hunch=.6;I.jaw=.2;I.tilt=Math.sin(G.time*.5)*.5;if(dP<9){BRAIN.action=null;BRAIN.think=0}}
     else if(act==='decoy'){faceTo(player.x,player.z,dt,1)}
+    else if(act==='herd'){BRAIN.action='hunt';BRAIN.think=1.2}
   }else{
     navTo(tx,tz,sp,dt);AI.moved+=MON.speed*dt;
     if(act==='search'){const sw=MON.yaw+Math.sin(G.time*1.3)*.8;I.look.set(MON.pos.x+Math.sin(sw)*4,1.4,MON.pos.z+Math.cos(sw)*4);I.jaw=.25;I.hunch=.6}
@@ -1164,7 +1206,7 @@ function showTitle(){
   $('goTitle').onclick=()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();newGame()};
 }
 function newGame(){H.games++;saveH();endCleanup();
-  RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.trail=[];G.sights=[];G.heat=new Float32Array(GW*GH);G.fq=[];G.batt=100;G.tapes=3;G.deaths=0;G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
+  RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.trail=[];G.sights=[];G.hides=[];G.hideT=0;G.heat=new Float32Array(GW*GH);G.fq=[];G.batt=100;G.tapes=3;G.deaths=0;G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
   placeNotes();placeBatteries();AI.first=true;AI.chain=0;spawnPlayer(START.x,START.y);brainReset(14);startIntro();
 }
 function spawnPlayer(cx,cy){player.x=(cx+.5)*CS;player.z=(cy+.5)*CS;let best=0,by=0;for(let k=0;k<24;k++){const a=k/24*Math.PI*2,fx=-Math.sin(a),fz=-Math.cos(a);let d=0;while(d<30&&losXZ(player.x,player.z,player.x+fx*(d+.5),player.z+fz*(d+.5)))d+=.5;if(d>best){best=d;by=a}}player.yaw=by;player.pitch=0;G.stam=100}
@@ -1481,11 +1523,11 @@ function updatePlayer(dt){
   const turn=2.2*dt;if(keys.ArrowLeft)player.yaw+=turn;if(keys.ArrowRight)player.yaw-=turn;if(keys.ArrowUp)player.pitch=clamp(player.pitch+turn*.7,-1.35,1.35);if(keys.ArrowDown)player.pitch=clamp(player.pitch-turn*.7,-1.35,1.35);
   const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);let f=0,s=0;if(keys.KeyW)f++;if(keys.KeyS)f--;if(keys.KeyD)s++;if(keys.KeyA)s--;f-=joy.y;s+=joy.x;
   let ix=fx*f-fz*s,iz=fz*f+fx*s;const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}
-  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;trackHabits(dt,run);
+  const run=(keys.ShiftLeft||keys.ShiftRight||tRun)&&il>.1&&G.stam>1&&!G.crouch;trackHabits(dt,run);player.run=run;
   G.stam=clamp(G.stam+(run?-24:8)*dt,0,100);
-  const sp=run?4.6:G.crouch?1.3:2.3;
+  const sp=run?5.8:G.crouch?1.3:2.3;
   const p={x:player.x+ix*sp*dt,z:player.z+iz*sp*dt};collide(p,.3);player.x=p.x;player.z=p.z;
-  const moving=il>.1;G.noise=moving?(run?15:G.crouch?1.5:5):0;
+  const moving=il>.1;G.noise=moving?(run?18:G.crouch?1.5:5):0;
   if(moving){player.walk+=dt*sp*2.2;player.stepT-=dt*sp;if(player.stepT<=0){player.stepT=1.25;SND.pStep()}}
   player.y=damp(player.y,G.crouch?CEYE:EYE,10,dt);
   player.ang=Math.atan2(fz,fx);
@@ -1579,6 +1621,36 @@ if(DEBUG)window.__dbg=function(mode,secs){
   composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85);
 };
 function initAudioStub(){}
+/* ---- self-play harness (only with #debug): bots play against the monster so its numbers can be tuned ---- */
+const BOT={glance:0,wander:null};
+function botStep(type,dt){
+  for(const k of['KeyW','KeyS','KeyA','KeyD','ShiftLeft'])keys[k]=false;
+  const dx=MON.pos.x-player.x,dz=MON.pos.z-player.z,d=Math.hypot(dx,dz);
+  const sees=MON.visible&&d<22&&losXZ(player.x,player.z,MON.pos.x,MON.pos.z),heard=MON.visible&&d<6&&BRAIN.silentT<=0;
+  const face=(tx,tz,rate)=>{const want=Math.atan2(-(tx-player.x),-(tz-player.z));player.yaw+=clamp(angDiff(player.yaw,want),-rate*dt,rate*dt)};
+  // route toward the goal
+  let goal=null;if(G.exitOpen&&exitDoor)goal={x:exitDoor.x+exitDoor.nx*.8,z:exitDoor.z+exitDoor.nz*.8};else{const i=nearestNote(player.x,player.z);if(i>=0)goal={x:notes[i].pos.x,z:notes[i].pos.z}}
+  if(type==='wander'){if(!BOT.wander||Math.hypot(BOT.wander.x-player.x,BOT.wander.z-player.z)<1.5)BOT.wander={x:(rnd()*GW|0)*CS+CS/2,z:(rnd()*GH|0)*CS+CS/2};if(rnd()<.002)BOT.wander=null;goal=goal&&rnd()<.5?goal:BOT.wander}
+  let wp=goal;if(goal){const[gx,gy]=cellOf(goal.x,goal.z);if(!BOT.f||BOT.fk!==gy*GW+gx){BOT.f=cellBFS(gx,gy);BOT.fk=gy*GW+gx}
+    const[cx,cy]=cellOf(player.x,player.z);let bv=BOT.f[cy*GW+cx],bx=cx,by=cy;for(const[ox,oy]of D4)if(edgeOpen(cx,cy,ox,oy)){const v=BOT.f[(cy+oy)*GW+cx+ox];if(v>=0&&v<bv){bv=v;bx=cx+ox;by=cy+oy}}
+    wp=(bx===cx&&by===cy)?goal:{x:(bx+.5)*CS,z:(by+.5)*CS}}
+  if(type==='careful'&&(sees||heard)){face(MON.pos.x,MON.pos.z,5);if(d<7)keys.KeyS=true;if(d<3.5&&G.stam>30){keys.KeyS=true;keys.ShiftLeft=true}}
+  else if(wp){BOT.glance-=dt;if(type!=='runner'&&BOT.glance<0){player.yaw+=2.8*dt;if(BOT.glance<-1.1)BOT.glance=3+rnd()*3}else face(wp.x,wp.z,6);keys.KeyW=true;
+    if(type==='runner'&&G.stam>15)keys.ShiftLeft=true;if(type==='careful'&&sees&&d<5&&G.stam>30)keys.ShiftLeft=true}
+  // interact
+  for(const n of notes){if(!n.taken&&Math.hypot(n.pos.x-player.x,n.pos.z-player.z)<1.4){readNote(n);closeNote()}}
+  if(G.exitOpen&&exitDoor&&Math.hypot(exitDoor.x-player.x,exitDoor.z-player.z)<1.6)return 'win';
+  return null}
+function runSim(tune,type,secs){
+  Object.assign(TUNE,TUNE0,tune||{},{learn:0});
+  Object.assign(H,{turnL:0,turnR:0,behind:0,playT:0,stareSum:0,stareN:0,runT:0,lightOffT:0});
+  window.__noRender=true;newGame();if(G.state==='intro')finishIntro();BOT.wander=null;BOT.f=null;BOT.glance=2;
+  const dt=1/20;let t=0,res='alive';
+  while(t<secs){const r=botStep(type,dt);if(r==='win'){res='win';break}frame(dt);t+=dt;if(G.state==='dying'||G.state==='dead'){res='killed';break}if(G.state!=='play'){if(G.state==='intro')finishIntro();else break}}
+  for(const k of['KeyW','KeyS','KeyA','KeyD','ShiftLeft'])keys[k]=false;
+  return{res,t:+t.toFixed(1),notes:G.notes}}
+const TUNE0=Object.assign({},TUNE);
+if(DEBUG){window.__runSim=runSim;window.__TUNE=TUNE;window.__TUNE0=TUNE0}
 if(DEBUG){window.__lvlStats=()=>({doors:hD.reduce((a,b)=>a+b,0)+vD.reduce((a,b)=>a+b,0),pillars:pillars.length,props:levelGroup.children.length,batts:batts.length});window.__skipIntro=()=>{if(G.state==='intro')finishIntro()};window.__intro=(t)=>{if(G.state!=='intro')startIntro();const dt=1/30;while(INTRO.t<t&&G.state==='intro'){updateIntro(dt);updateLights(dt);if(CR&&MON.visible&&!INTRO.monFrozen&&computePose(dt))CR.apply(POSE)}composer.render(dt);return G.state==='intro'?renderer.domElement.toDataURL('image/jpeg',.85):'done:'+G.state};window.__ending=(t)=>{if(G.state!=='ending'){startEnding()}const dt=1/30;while(END.t<t&&G.state==='ending')updateEnding(dt);composer.render(dt);return G.state==='ending'?renderer.domElement.toDataURL('image/jpeg',.85):'done'};window.__BRAIN=BRAIN;window.__BR=BR;window.__toggleMap=toggleMap;window.__los=losXZ;window.__notes=()=>notes;window.__readNote=readNote;window.__closeNote=closeNote;window.__exit=()=>exitDoor;window.__initAudio=initAudio;window.__G=G;window.__AI=AI;window.__MON=MON;window.__player=player;window.__frame=frame;window.__newGame=()=>{newGame()};
   window.__force=(ev)=>{const f={stare:()=>spawnStare(10,22,false)||spawnStare(10,22,true),peek:spawnPeek,cross:spawnCross,behind:spawnBehind}[ev];return f?f():false};
   window.__shot=()=>{composer.render(1/60);return renderer.domElement.toDataURL('image/jpeg',.85)};

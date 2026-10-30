@@ -49,11 +49,18 @@ Several times a second it scores its options and commits to the best one. Its pa
 - **Flank:** slips behind walls and circles to your blind side.
 - **Ambush:** reads which way you're walking, waits at a corner ahead of you, and peeks out.
 - **Lurk:** stands perfectly still in the dark at the edge of your view for you to find.
-- **Guard:** it knows what you're looking for. It waits near the next note, or the exit, and watches for you to arrive.
-- **Decoy:** it makes footsteps on the far side of you, then comes in silently from the other side.
+- **Guard:** it knows what you're looking for. It works out your route to the next note or the exit, then waits at a doorway or narrow corridor along the way.
+- **Decoy:** it copies your own footsteps on the far side of you, then comes in silently from the other side.
+- **Herd:** it finds dead ends near you and comes at you from the other side, so you run into them.
 - **Back off:** if it has been on top of you too long, it retreats for a while, then comes back.
 
 Stare at it too long and it forces a burst of flickers and bolts for the nearest cover.
+
+## How it learns
+
+**It learns which tactics work on you.** Every catch, near miss and escape is credited to the tactic it was using. It picks tactics that have worked on you more often, and drops the ones you beat. This is saved in your browser and shown on the death screen. It also remembers where you hid this run, and checks those spots first.
+
+**It was trained by self-play.** Bot players (one careful, one that sprints everywhere, one that wanders) played thousands of matches against it. A search process tuned its numbers (how it weighs each tactic, how fast it moves, how often your light flickers, how soon it bolts when stared at) to catch players as effectively as possible while a careful player still survives about a third of the time. To run the harness yourself, open `index.html#debug` and call `__runSim({}, 'careful', 120)` from the console.
 
 ## The map
 
@@ -71,7 +78,7 @@ Open the EXIT door and a short film plays. You stumble out into a rainy parking 
 
 | Action | Keys |
 | --- | --- |
-| Move / run / crouch | W A S D / Shift / C |
+| Move / sprint / crouch | W A S D / Shift / C |
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
 | Read a note / open the door | E |
 | Flashlight on/off | F |
