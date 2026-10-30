@@ -16,6 +16,20 @@ It uses `smily_horror_monster.glb`, scaled to stand 6 feet tall. Every movement 
 - **Chases on all fours**, with each hand and foot planting on the floor.
 - **Grabs your face** if it catches you.
 
+## The intro
+
+You carry the last box down the basement stairs, lean on the wall, and fall through it. You drop through the ceiling of somewhere else and land on damp carpet under humming lights. Then the lights die one by one, far to near. In the last of the light, something is standing at the end of the hall. Your camera light clicks on and the hall is empty. Press E or tap to skip.
+
+## The level
+
+A new 32×32 maze every tape: yellow wallpaper with uneven wear, doorways cut into the walls, pillar halls, long corridors, missing and fallen ceiling tiles, outlets, vents, damp stains and abandoned office chairs.
+
+## Harder
+
+- **Battery:** your flashlight drains its battery, and it flickers more and dims when low. Seven spare camcorder batteries are hidden around the level (look for a tiny green LED).
+- **Three tapes:** each death costs one. Lose all three and the tape is erased, and you start over in a new maze.
+- **Tuning:** the monster is faster, backs off less often, and gets more aggressive with every note, every death and every minute.
+
 ## The rule
 
 It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. But your flashlight flickers when it's close or when you stare too long, and in every dark flicker it moves.
@@ -28,13 +42,15 @@ It's always somewhere in the maze. Nothing teleports. It builds a belief about w
 - **Sound:** running is loud, walking is quieter, crouching is nearly silent.
 - **Memory:** it learns your habits (turn direction, whether you check behind you, how long you stare, whether you hide in the dark) and saves them in your browser.
 
-Several times a second it scores its options and commits to the best one:
+Several times a second it scores its options and commits to the best one. Its paths avoid your flashlight beam and line of sight, so it moves through the dark:
 
 - **Search:** walks upright, head sweeping, checking the places you spend the most time.
 - **Hunt:** heads for where you're going, not just where you are, and creeps slowly for the last few meters.
 - **Flank:** slips behind walls and circles to your blind side.
 - **Ambush:** reads which way you're walking, waits at a corner ahead of you, and peeks out.
 - **Lurk:** stands perfectly still in the dark at the edge of your view for you to find.
+- **Guard:** it knows what you're looking for. It waits near the next note, or the exit, and watches for you to arrive.
+- **Decoy:** it makes footsteps on the far side of you, then comes in silently from the other side.
 - **Back off:** if it has been on top of you too long, it retreats for a while, then comes back.
 
 Stare at it too long and it forces a burst of flickers and bolts for the nearest cover.
