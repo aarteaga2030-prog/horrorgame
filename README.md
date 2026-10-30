@@ -6,7 +6,7 @@ You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper
 
 ## The monster
 
-It uses `smily_horror_monster.glb`, scaled to stand 6 feet tall. Every movement is procedural: the game drives the model's bones with inverse kinematics instead of playing canned animations.
+It uses `smily_horror_monster.glb`, scaled to stand 2.35 m (about 7'8") tall. It hunches to squeeze through doorways. Every movement is procedural: the game drives the model's bones with inverse kinematics instead of playing canned animations.
 
 - **Walks wrong:** hunched over, one leg dragging, with stop-motion stutters and sudden head twitches.
 - **Drags a hand along the wall** when it walks near one.
@@ -51,6 +51,8 @@ Several times a second it scores its options and commits to the best one. Its pa
 - **Lurk:** stands perfectly still in the dark at the edge of your view for you to find.
 - **Guard:** it knows what you're looking for. It works out your route to the next note or the exit, then waits at a doorway or narrow corridor along the way.
 - **Decoy:** it copies your own footsteps on the far side of you, then comes in silently from the other side.
+- **Intercept:** when you sprint, it predicts your route through the maze and heads for a point ahead of you.
+- **Wait:** if you hide (standing still, crouched or in the dark), it creeps close, goes completely silent, and waits for you to move.
 - **Herd:** it finds dead ends near you and comes at you from the other side, so you run into them.
 - **Back off:** if it has been on top of you too long, it retreats for a while, then comes back.
 
@@ -58,7 +60,7 @@ Stare at it too long and it forces a burst of flickers and bolts for the nearest
 
 ## How it learns
 
-**It learns which tactics work on you.** Every catch, near miss and escape is credited to the tactic it was using. It picks tactics that have worked on you more often, and drops the ones you beat. This is saved in your browser and shown on the death screen. It also remembers where you hid this run, and checks those spots first.
+**It learns which tactics work on you.** Every catch, near miss and escape is credited to the tactic it was using. It also checks whether you turned toward its decoy footsteps. It picks tactics that have worked on you more often, and drops the ones you beat. This is saved in your browser and shown on the death screen. It also remembers where you hid this run, and checks those spots first.
 
 **It was trained by self-play.** Bot players (one careful, one that sprints everywhere, one that wanders) played thousands of matches against it. A search process tuned its numbers (how it weighs each tactic, how fast it moves, how often your light flickers, how soon it bolts when stared at) to catch players as effectively as possible while a careful player still survives about a third of the time. To run the harness yourself, open `index.html#debug` and call `__runSim({}, 'careful', 120)` from the console.
 
