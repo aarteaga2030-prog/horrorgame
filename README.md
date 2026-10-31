@@ -47,6 +47,13 @@ The cut-out walls block you, the monster and its line of sight; the counters and
 
 **Furniture.** Ladder-back chairs, 70s desk chairs, dressers, sofas, armchairs and low tables are scattered around. Some stand against the walls and some lie knocked over on their sides or backs. A few corners are set up like an abandoned waiting room: a sofa against the wall, a low table and two armchairs. You and the monster both collide with all of it.
 
+## Settings (start menu)
+
+Both are off by default, and the game remembers your choice in this browser.
+
+- **Kill cam:** when it catches you, you watch the last ~15 seconds again from above: you (blue ring and arrow, with your flashlight beam), and the monster moving exactly as it did. Press E or click to skip.
+- **Pina mode:** the monster gets Mr. Pina's face (from `pina_face.jpg`), his skin tone, a black DOOM tee and dark jeans. The face is built onto a new head that follows the monster's head bone; the original head is hidden.
+
 ## How it looks
 
 - **Surfaces:** walls, carpet and ceiling tiles get fine 3D surface detail applied in world space, so it lines up on the maze and on the scanned rooms alike. The wallpaper has paper grain and bubbles, the carpet has tufts with a soft fabric sheen at low angles, and the ceiling tiles are pitted and cracked. Recesses read darker and rougher.
