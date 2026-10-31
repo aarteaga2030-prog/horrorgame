@@ -185,7 +185,7 @@ function generate(){
   // lights: panels on a checkerboard, dead zones, flickerers
   panels=[];const zones=[];for(let k=0;k<5;k++)zones.push({x:rnd()*GW,y:rnd()*GH,r:2.2+rnd()*3});
   for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){if((x+y)%2)continue;let dead=zones.some(z=>Math.hypot(x+.5-z.x,y+.5-z.y)<z.r);if(Math.abs(x-START.x)<2&&Math.abs(y-START.y)<2)dead=false;
-    if(extraNear((x+.5)*CS,(y+.5)*CS,.75,true))continue;
+    if(REGC[y*GW+x]>=0)continue;
     panels.push({x:(x+.5)*CS,z:(y+.5)*CS,cx:x,cy:y,alive:!dead||rnd()<.08,flick:rnd()<.07,fl:1,ft:rnd()*3})}
   cellLight=new Float32Array(GW*GH);
   for(const p of panels){if(!p.alive)continue;for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const x=p.cx+ox,y=p.cy+oy;if(inCell(x,y))cellLight[y*GW+x]+=(ox||oy)?.45:1}}
@@ -586,11 +586,11 @@ function buildProps(){
   const ventTex=ctex(64,64,(g,w,h)=>{g.fillStyle='#8a8676';g.fillRect(0,0,w,h);g.fillStyle='#1a1814';for(let y=6;y<h-4;y+=7)g.fillRect(5,y,w-10,4)});
   inst(new THREE.BoxGeometry(.42,.26,.015),new THREE.MeshStandardMaterial({map:ventTex,roughness:.7,metalness:.3}),vents);
   // missing ceiling tiles (dark holes) and some fallen ones
-  const holes=[],fallen=[];for(let i=0;i<70;i++){const x=Math.floor(rnd()*GW*4)/4*CS+CS/8,z=Math.floor(rnd()*GH*4)/4*CS+CS/8;holes.push({p:new V3(x,WH-.004,z),rx:Math.PI/2});if(rnd()<.45)fallen.push({p:new V3(x+(rnd()-.5)*.8,.02+rnd()*.03,z+(rnd()-.5)*.8),ry:rnd()*3,rx:(rnd()-.5)*.15})}
+  const holes=[],fallen=[];for(let i=0;i<70;i++){const x=Math.floor(rnd()*GW*4)/4*CS+CS/8,z=Math.floor(rnd()*GH*4)/4*CS+CS/8;if(REGC[cellOf(x,z)[1]*GW+cellOf(x,z)[0]]>=0)continue;holes.push({p:new V3(x,WH-.004,z),rx:Math.PI/2});if(rnd()<.45)fallen.push({p:new V3(x+(rnd()-.5)*.8,.02+rnd()*.03,z+(rnd()-.5)*.8),ry:rnd()*3,rx:(rnd()-.5)*.15})}
   inst(new THREE.PlaneGeometry(CS/4-.03,CS/4-.03),new THREE.MeshBasicMaterial({color:0x020202}),holes);
   inst(new THREE.BoxGeometry(CS/4-.04,.018,CS/4-.04),new THREE.MeshStandardMaterial({color:0xc8c2a4,roughness:.95}),fallen,true);
   // damp stains on the carpet
-  const stains=[];for(let i=0;i<70;i++)stains.push({p:new V3(rnd()*GW*CS,.006,rnd()*GH*CS),rx:-Math.PI/2,s:new V3(.6+rnd()*1.8,.4+rnd()*1.2,1),rz:rnd()*3});
+  const stains=[];for(let i=0;i<70;i++){const sx=rnd()*GW*CS,sz=rnd()*GH*CS;if(REGC[cellOf(sx,sz)[1]*GW+cellOf(sx,sz)[0]]>=0)continue;stains.push({p:new V3(sx,.006,sz),rx:-Math.PI/2,s:new V3(.6+rnd()*1.8,.4+rnd()*1.2,1),rz:rnd()*3})}
   inst(new THREE.CircleGeometry(1,20),new THREE.MeshStandardMaterial({color:0x1e170a,transparent:true,opacity:.38,roughness:.4,depthWrite:false}),stains);
 }
 /* ============ WORLD ASSETS: rooms cut out of the scanned backrooms model, and furniture ============ */
@@ -639,8 +639,12 @@ function prepareWorld(gltf){
   const src={};rooms.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);
     const nm=o.material.name;const e=src[nm]||(src[nm]={v:[],mat:o.material});const P=g.attributes.position,N=g.attributes.normal,U=g.attributes.uv;
     for(let i=0;i<P.count;i++)e.v.push([P.getX(i),P.getY(i),P.getZ(i),N?N.getX(i):0,N?N.getY(i):1,N?N.getZ(i):0,U?U.getX(i):0,U?U.getY(i):0])});
-  const mats={};for(const k in src){if(/^Wall_|^Withe$/.test(k))continue;mats[k]=propMaterial(src[k].mat)}
-  for(const def of CHUNK_DEFS){const[xa,xb,za,zb]=def.crop;const tri={};let topY=-1e9;
+  const mats={};for(const k in src){const mm=propMaterial(src[k].mat);mm.side=THREE.FrontSide;mm.roughness=/^Moquette/.test(k)?1:.9;
+    if(k==='Emission_Red'){mm.color.setHex(0x300000);mm.emissive=new THREE.Color(0xff1a10);mm.emissiveIntensity=1.6;mm.toneMapped=false}
+    if(/Translucent|Traslucent|Ceiling_Lamp|^Lamp$/.test(k))mm.side=THREE.DoubleSide;mats[k]=mm}
+  const texColor=(t,fb)=>{try{const c=document.createElement('canvas');c.width=c.height=48;const g=c.getContext('2d');g.drawImage(t.image,0,0,48,48);const d=g.getImageData(0,0,48,48).data;let r=0,gg=0,b=0,n=0;
+    for(let i=0;i<d.length;i+=4){if(d[i]+d[i+1]+d[i+2]<90)continue;r+=d[i];gg+=d[i+1];b+=d[i+2];n++}return n?new THREE.Color(r/n/255,gg/n/255,b/n/255).convertSRGBToLinear():fb}catch(e){return fb}};
+  for(const def of CHUNK_DEFS){try{const[xa,xb,za,zb]=def.crop;const tri={};let topY=-1e9;
     for(const k in src){const V=src[k].v,out=[];
       for(let i=0;i<V.length;i+=3){let p=[V[i],V[i+1],V[i+2]];
         const mnx=Math.min(p[0][0],p[1][0],p[2][0]),mxx=Math.max(p[0][0],p[1][0],p[2][0]),mnz=Math.min(p[0][2],p[1][2],p[2][2]),mxz=Math.max(p[0][2],p[1][2],p[2][2]);
@@ -675,7 +679,8 @@ function prepareWorld(gltf){
     for(let i=0;i<boxes.length;i++)for(let j=boxes.length-1;j>i;j--){const A=boxes[i],B=boxes[j];const ox=Math.min(A.s1,B.s1)-Math.max(A.s0,B.s0),oz=Math.min(A.t1,B.t1)-Math.max(A.t0,B.t0);
       if(ox>0&&oz>0&&ox*oz>.5*Math.min((A.s1-A.s0)*(A.t1-A.t0),(B.s1-B.s0)*(B.t1-B.t0))){A.s0=Math.min(A.s0,B.s0);A.s1=Math.max(A.s1,B.s1);A.t0=Math.min(A.t0,B.t0);A.t1=Math.max(A.t1,B.t1);A.y0=Math.min(A.y0,B.y0);A.y1=Math.max(A.y1,B.y1);boxes.splice(j,1)}}
     const geo={};for(const k in tri){const T=tri[k],a=new Float32Array(T.length*8);T.forEach((v,i)=>{const s=S(v);a.set([s[0],s[1],s[2],v[3],v[4],v[5],v[6],v[7]],i*8)});geo[k]=a}
-    CHUNKS.push(Object.assign({},def,{geo,segs,boxes,mats}))}
+    const wk=Object.keys(tri).filter(k=>/^Wall_/.test(k)).sort((a,b)=>tri[b].length-tri[a].length)[0];const wallColor=wk&&src[wk].mat.map?texColor(src[wk].mat.map,new THREE.Color(.55,.42,.16)):new THREE.Color(.55,.42,.16);
+    CHUNKS.push(Object.assign({},def,{geo,segs,boxes,mats,wallColor}))}catch(e){console.warn('Room chunk failed',def.name,e)}}
 }
 // chunk-normalised (s,t) -> world (x,z) for a placed region
 function regionXZ(R,s,t){let u,v;switch(R.rot){case 1:u=1-t;v=s;break;case 2:u=1-s;v=1-t;break;case 3:u=t;v=1-s;break;default:u=s;v=t}
@@ -687,6 +692,7 @@ function carveRegions(){
   const big=shuffle(CHUNKS.filter(c=>c.big)).slice(0,2),small=shuffle(CHUNKS.filter(c=>!c.big)).slice(0,3);
   for(const ch of[...big,...small]){
     for(let t=0;t<300;t++){const rot=rnd()*4|0;const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;const x0=1+(rnd()*(GW-w-1)|0),y0=1+(rnd()*(GH-h-1)|0);
+      if(ch===big[0]&&t<200){const dx=Math.max(x0-START.x,0,START.x-(x0+w-1)),dy=Math.max(y0-START.y,0,START.y-(y0+h-1));if(Math.max(dx,dy)>6)continue}
       if(x0+w>GW-1||y0+h>GH-1)continue;
       if(START.x>=x0-3&&START.x<x0+w+3&&START.y>=y0-3&&START.y<y0+h+3)continue;
       let bad=false;for(let y=y0-1;y<=y0+h&&!bad;y++)for(let x=x0-1;x<=x0+w;x++)if(inCell(x,y)&&REGC[y*GW+x]>=0){bad=true;break}if(bad)continue;
@@ -779,19 +785,23 @@ function planProps(){
         const yaw=tipped?rnd()*6.28:Math.atan2(-dx,-dy)-T.backYaw+Math.PI+(rnd()-.5)*(key==='dresser'?.06:.6);ok=tryProp(key,px,pz,yaw,tipped)}
       else{const px=(x+.5+(rnd()<.5?-1:1)*(.22+rnd()*.13))*CS,pz=(y+.5+(rnd()<.5?-1:1)*(.22+rnd()*.13))*CS;ok=tryProp(key,px,pz,rnd()*6.28,tipped)}
       if(ok)placed++}}}
-function buildRegionMeshes(wallMat){
-  const wm=wallMat.clone();wm.side=THREE.FrontSide;const baseMat=new THREE.MeshStandardMaterial({color:0x4a3a1e,roughness:.6,side:THREE.DoubleSide});
+const roomWallTex={};
+function roomWallMaterial(ch){// a tiling wallpaper in the room's own colour, for our grid walls that face into the room
+  if(!roomWallTex[ch.name]){const c=ch.wallColor.clone().convertLinearToSRGB();const R=c.r*255|0,Gc=c.g*255|0,B=c.b*255|0;
+    const t=ctex(256,256,(g,w,h)=>{g.fillStyle=`rgb(${R},${Gc},${B})`;g.fillRect(0,0,w,h);for(let x=0;x<w;x+=8){g.fillStyle=(x/8)%2?'rgba(255,250,220,.035)':'rgba(70,50,10,.03)';g.fillRect(x,0,8,h)}
+      for(let i=0;i<5000;i++){g.fillStyle=`rgba(${TR()<.5?'60,45,10':'255,245,210'},${TR()*.05})`;g.fillRect(TR()*w,TR()*h,1.5,1.5)}
+      const bg=g.createLinearGradient(0,h*.82,0,h);bg.addColorStop(0,'rgba(70,50,15,0)');bg.addColorStop(1,'rgba(70,50,15,.22)');g.fillStyle=bg;g.fillRect(0,h*.82,w,h*.18)});
+    roomWallTex[ch.name]=new THREE.MeshStandardMaterial({map:t,roughness:.9})}
+  return roomWallTex[ch.name]}
+function buildRegionMeshes(){
   for(const R of REGIONS){const ch=R.ch;
     for(const k in ch.geo){const A=ch.geo[k],n=A.length/8,isWall=/^Wall_/.test(k);const pos=new Float32Array(n*3),nrm=new Float32Array(n*3),uv=new Float32Array(n*2);
       for(let i=0;i<n;i++){const o=i*8;const[x,z]=regionXZ(R,A[o],A[o+2]);const[nx,nz]=regionN(R,A[o+3],A[o+5]);pos[i*3]=x;pos[i*3+1]=A[o+1];pos[i*3+2]=z;nrm[i*3]=nx;nrm[i*3+1]=A[o+4];nrm[i*3+2]=nz;uv[i*2]=A[o+6];uv[i*2+1]=A[o+7]}
       if(isWall)for(let t=0;t<n;t+=3){// flat normals from the winding: the scan's own normals disagree with it on arches and corners
         const i0=t*3,i1=(t+1)*3,i2=(t+2)*3;const ux=pos[i1]-pos[i0],uy=pos[i1+1]-pos[i0+1],uz=pos[i1+2]-pos[i0+2],vx=pos[i2]-pos[i0],vy=pos[i2+1]-pos[i0+1],vz=pos[i2+2]-pos[i0+2];
-        let fx=uy*vz-uz*vy,fy=uz*vx-ux*vz,fz=ux*vy-uy*vx;const fl=Math.hypot(fx,fy,fz)||1;fx/=fl;fy/=fl;fz/=fl;for(let k2=0;k2<3;k2++){nrm[(t+k2)*3]=fx;nrm[(t+k2)*3+1]=fy;nrm[(t+k2)*3+2]=fz}
-// box-project our own wallpaper so the cut-out walls match the rest of the level
-        let ax=0,ay=0,az=0;for(let k2=0;k2<3;k2++){ax+=Math.abs(nrm[(t+k2)*3]);ay+=Math.abs(nrm[(t+k2)*3+1]);az+=Math.abs(nrm[(t+k2)*3+2])}
-        for(let k2=0;k2<3;k2++){const i=t+k2,x=pos[i*3],y=pos[i*3+1],z=pos[i*3+2];if(ay>ax&&ay>az){uv[i*2]=x/(CS+WT);uv[i*2+1]=z/(CS+WT)}else{uv[i*2]=(ax>az?z:x)/(CS+WT);uv[i*2+1]=y/WH}}}
+        let fx=uy*vz-uz*vy,fy=uz*vx-ux*vz,fz=ux*vy-uy*vx;const fl=Math.hypot(fx,fy,fz)||1;fx/=fl;fy/=fl;fz/=fl;for(let k2=0;k2<3;k2++){nrm[(t+k2)*3]=fx;nrm[(t+k2)*3+1]=fy;nrm[(t+k2)*3+2]=fz}}
       const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.computeBoundingSphere();
-      const mesh=new THREE.Mesh(g,isWall?wm:k==='Withe'?baseMat:ch.mats[k]);mesh.castShadow=isWall||/Furniture|ArmChair|Wood/.test(k);mesh.receiveShadow=true;mesh.userData.regionGeo=true;levelGroup.add(mesh)}}}
+      const mesh=new THREE.Mesh(g,ch.mats[k]);mesh.castShadow=isWall||/Furniture|ArmChair|Wood/.test(k);mesh.receiveShadow=!/Emission/.test(k);mesh.userData.regionGeo=true;levelGroup.add(mesh)}}}
 function buildPropMeshes(){
   if(!PROPS.length||!PROPT)return;const by={};PROPS.forEach(p=>(by[p.key]=by[p.key]||[]).push(p));const m=new THREE.Matrix4(),q=new Q(),one=new V3(1,1,1);
   for(const key in by){const T=PROPT[key],L=by[key];
@@ -801,12 +811,21 @@ function buildLevel(){
   const wallMat=new THREE.MeshStandardMaterial({map:wallTex,roughness:.92});
   const n=hE.reduce((a,b)=>a+b,0)+vE.reduce((a,b)=>a+b,0);
   const geo=new THREE.BoxGeometry(CS+WT,WH,WT);
+  const regOf=(x,y)=>inCell(x,y)?REGC[y*GW+x]:-1;const special=[];// [matrix index, region id, +z side?]
   const walls=new THREE.InstancedMesh(geo,wallMat,n);walls.receiveShadow=true;walls.castShadow=true;
   const base=new THREE.InstancedMesh(new THREE.BoxGeometry(CS+WT+.02,.11,WT+.035),new THREE.MeshStandardMaterial({color:0x4a3a1e,roughness:.6}),n);
   const m=new THREE.Matrix4(),qy=new Q().setFromAxisAngle(UP,Math.PI/2),q0=new Q(),one=new V3(1,1,1);let k=0;
-  for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hE[hI(x,y)]){m.compose(new V3((x+.5)*CS,WH/2,y*CS),q0,one);walls.setMatrixAt(k,m);m.compose(new V3((x+.5)*CS,.055,y*CS),q0,one);base.setMatrixAt(k++,m)}
-  for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vE[vI(x,y)]){m.compose(new V3(x*CS,WH/2,(y+.5)*CS),qy,one);walls.setMatrixAt(k,m);m.compose(new V3(x*CS,.055,(y+.5)*CS),qy,one);base.setMatrixAt(k++,m)}
+  const mark=(a,b,pos,q)=>{if(a>=0&&b<0)special.push([pos,q,a,true]);else if(b>=0&&a<0)special.push([pos,q,b,false])};
+  for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hE[hI(x,y)]){const P=new V3((x+.5)*CS,WH/2,y*CS);mark(regOf(x,y),regOf(x,y-1),P,q0);m.compose(P,q0,one);walls.setMatrixAt(k,m);m.compose(new V3((x+.5)*CS,.055,y*CS),q0,one);base.setMatrixAt(k++,m)}
+  for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vE[vI(x,y)]){const P=new V3(x*CS,WH/2,(y+.5)*CS);mark(regOf(x,y),regOf(x-1,y),P,qy);m.compose(P,qy,one);walls.setMatrixAt(k,m);m.compose(new V3(x*CS,.055,(y+.5)*CS),qy,one);base.setMatrixAt(k++,m)}
   levelGroup.add(walls,base);
+  if(special.length){// a thin skin of the room's wallpaper and its cream skirting on the inside face of the boundary walls
+    const skin=new THREE.PlaneGeometry(CS+WT,WH),skirt=new THREE.BoxGeometry(CS+WT,.1,.012),skirtMat=new THREE.MeshStandardMaterial({color:0xc8b37a,roughness:.6});
+    const byR={};special.forEach(sp=>(byR[sp[2]]=byR[sp[2]]||[]).push(sp));
+    for(const id in byR){const L=byR[id],ch=REGIONS[id].ch;const im=new THREE.InstancedMesh(skin,roomWallMaterial(ch),L.length),sk=new THREE.InstancedMesh(skirt,skirtMat,L.length);
+      L.forEach((sp,i)=>{const[P,q,,plus]=sp;const nrm=new V3(0,0,plus?1:-1).applyQuaternion(q);const qq=q.clone();if(!plus)qq.multiply(new Q().setFromAxisAngle(UP,Math.PI));
+        m.compose(P.clone().addScaledVector(nrm,WT/2+.004),qq,one);im.setMatrixAt(i,m);m.compose(new V3(P.x,.05,P.z).addScaledVector(nrm,WT/2+.01),qq,one);sk.setMatrixAt(i,m)});
+      im.receiveShadow=true;sk.receiveShadow=true;levelGroup.add(im,sk)}}
   const tint=new THREE.Color();for(let i=0;i<n;i++){const v=.8+rnd()*.2;walls.setColorAt(i,tint.setRGB(v,v*(.97+rnd()*.03),v*(.9+rnd()*.08)))}walls.instanceColor.needsUpdate=true;
   // doorways
   const L=(CS-DOORW)/2,nd=hD.reduce((a,b)=>a+b,0)+vD.reduce((a,b)=>a+b,0);
@@ -818,10 +837,13 @@ function buildLevel(){
     for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hD[hI(x,y)])put((x+.5)*CS,y*CS,false);
     for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vD[vI(x,y)])put(x*CS,(y+.5)*CS,true);
     [stub,head,trim].forEach(o=>{o.castShadow=o.receiveShadow=true;levelGroup.add(o)})}
-  buildProps();buildRegionMeshes(wallMat);buildPropMeshes();
+  buildProps();buildRegionMeshes();buildPropMeshes();
   if(pillars.length){const pm=new THREE.InstancedMesh(new THREE.BoxGeometry(.5,WH,.5),wallMat,pillars.length);pillars.forEach((p,i)=>{m.compose(new V3(p.x,WH/2,p.z),q0,one);pm.setMatrixAt(i,m)});pm.receiveShadow=pm.castShadow=true;levelGroup.add(pm)}
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(GW*CS,GH*CS),new THREE.MeshStandardMaterial({map:carpetTex,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.set(GW*CS/2,0,GH*CS/2);floor.receiveShadow=true;levelGroup.add(floor);
-  const ceil=new THREE.Mesh(new THREE.PlaneGeometry(GW*CS,GH*CS),new THREE.MeshStandardMaterial({map:ceilTex,roughness:.95}));ceil.rotation.x=Math.PI/2;ceil.position.set(GW*CS/2,WH,GH*CS/2);levelGroup.add(ceil);
+  const plane=(y,up)=>{const P=[],U=[];const W=GW*CS,H=GH*CS;for(let cy=0;cy<GH;cy++)for(let cx=0;cx<GW;cx++){if(REGC[cy*GW+cx]>=0)continue;const x0=cx*CS,x1=x0+CS,z0=cy*CS,z1=z0+CS;
+      const q=up?[[x0,z0],[x0,z1],[x1,z1],[x0,z0],[x1,z1],[x1,z0]]:[[x0,z0],[x1,z1],[x0,z1],[x0,z0],[x1,z0],[x1,z1]];for(const[x,z]of q){P.push(x,y,z);U.push(x/W,1-z/H)}}
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(U,2));g.computeVertexNormals();g.userData=1;return g};
+  const floor=new THREE.Mesh(plane(0,true),new THREE.MeshStandardMaterial({map:carpetTex,roughness:1}));floor.receiveShadow=true;floor.userData.regionGeo=true;levelGroup.add(floor);
+  const ceil=new THREE.Mesh(plane(WH,false),new THREE.MeshStandardMaterial({map:ceilTex,roughness:.95}));ceil.userData.regionGeo=true;levelGroup.add(ceil);
   const pg=new THREE.PlaneGeometry(.62,1.24);pg.rotateX(Math.PI/2);
   panelMesh=new THREE.InstancedMesh(pg,new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false}),panels.length);
   panels.forEach((p,i)=>{m.compose(new V3(p.x,WH-.012,p.z),q0,one);panelMesh.setMatrixAt(i,m);panelMesh.setColorAt(i,panelColor.setRGB(.03,.028,.025))});

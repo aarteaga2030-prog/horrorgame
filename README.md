@@ -24,7 +24,7 @@ You carry the last box down the basement stairs, lean on the wall, and fall thro
 
 A new 32×32 maze every tape: yellow wallpaper with uneven wear, doorways cut into the walls, pillar halls, long corridors, missing and fallen ceiling tiles, outlets, vents and damp stains.
 
-**Rooms cut from the Backrooms VR scan.** Each tape drops two big rooms and three small ones into the maze, cut out of `backrooms_vr.glb` and turned a random way. They keep the scan's own layout and furniture. Their walls use the same wallpaper as the rest of the level, so they blend in. You enter through two to four doorways.
+**Rooms cut from the Backrooms VR scan.** Each tape drops two big rooms and three small ones into the maze, cut out of `backrooms_vr.glb` and turned a random way. They keep the scan's own layout, walls, carpet, ceiling tiles, ceiling lamps, vents, smoke detectors and furniture, so they look like the scan rather than the rest of the maze. The lamp glow baked into the scan's textures is taken out so the rooms are as dark as everywhere else. One of the big rooms is always within a few cells of where you start. You enter each room through two to four doorways.
 
 | Room | What's in it |
 | --- | --- |
