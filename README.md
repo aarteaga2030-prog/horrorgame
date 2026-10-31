@@ -24,15 +24,22 @@ You carry the last box down the basement stairs, lean on the wall, and fall thro
 
 A new 32×32 maze every tape: yellow wallpaper with uneven wear, doorways cut into the walls, pillar halls, long corridors, missing and fallen ceiling tiles, outlets, vents and damp stains.
 
-**Rooms cut from the Backrooms VR scan.** Each tape drops two big rooms and three small ones into the maze, cut out of `backrooms_vr.glb` and turned a random way. They keep the scan's own layout, walls, carpet, ceiling tiles, ceiling lamps, vents, smoke detectors and furniture, so they look like the scan rather than the rest of the maze. The lamp glow baked into the scan's textures is taken out so the rooms are as dark as everywhere else. One of the big rooms is always within a few cells of where you start. You enter each room through two to four doorways.
+**Rooms cut from the Backrooms VR scan.** Most of each new tape's map, about 70%, is rooms cut out of `backrooms_vr.glb`. That's 35–40 rooms per tape, each turned and mirrored at random, sitting wall to wall and joined by doorways. Short stretches of maze fill the gaps between them. Arch rooms come up the most. One big room is always within a few cells of where you start. The rooms keep the scan's layout, carpet, ceiling tiles, lamps, vents, smoke detectors (with their red lights) and furniture. The lamp glow baked into the scan is taken out, so the rooms are as dark as everywhere else.
+
+**One look everywhere.** The maze's own walls, carpet, ceiling tiles and cream skirting use the colours of the scan, and each section of the scan is evened out to the same shade. A corridor and a cut-out room look like the same place.
 
 | Room | What's in it |
 | --- | --- |
 | Arch hall | A row of arched pillars and a pile of armchairs and side tables |
-| Offices | An L-shaped wall block, an alcove and half-height counters |
-| Partition hall | A long wall with a side corridor and thin partitions |
-| Lounge | The armchair pile on its own |
+| Arch wing | The arched pillars along one side of a long room |
+| Arch lounge | The armchair pile next to the arches |
+| Short arches | A short run of arches |
 | Colonnade | A narrow hall along the arches |
+| Offices | An L-shaped wall block, an alcove and half-height counters |
+| Counter room | The counters and the L-shaped block |
+| Partition hall | A long wall with a side corridor and thin partitions |
+| Side corridor | A corridor behind a long wall with doorways |
+| Lounge | The armchair pile on its own (rare) |
 | Alcove | A small side room |
 | Partitions | A corner of short dividing walls |
 

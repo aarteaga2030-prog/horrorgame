@@ -180,6 +180,7 @@ function generate(){
   for(let guard=0;guard<2000;guard++){const d=cellBFS(START.x,START.y);let fixed=false;
     for(let c=0;c<GW*GH&&!fixed;c++){if(d[c]>=0||REGC[c]>=0||VOIDC[c])continue;const x=c%GW,y=(c/GW)|0;for(const[dx,dy]of D4){if(inCell(x+dx,y+dy)&&d[c+dx+dy*GW]>=0){setEdge(x,y,dx,dy,0);fixed=true;break}}}
     if(!fixed)break}
+  connectRegions();
   {const d=cellBFS(START.x,START.y);for(let c=0;c<GW*GH;c++)if(d[c]<0)VOIDC[c]=Math.max(VOIDC[c],1)}
   planProps();hashExtras();
   // lights: panels on a checkerboard, dead zones, flickerers
@@ -540,28 +541,28 @@ addEventListener('resize',resize);resize();
 /* ============ TEXTURES ============ */
 const TR=mulberry(91);
 function ctex(w,h,draw,rep){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g,w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;if(rep)t.repeat.set(rep[0],rep[1]);return t}
+// one palette for the whole level, taken from the Backrooms VR scan (its walls, carpet and ceiling with the lamp glow removed)
+const PAL={wall:[176,142,58],carpet:[186,152,85],ceil:[168,136,60],skirt:0xc3af76};
+const rgbs=(c,k=1)=>`rgb(${c[0]*k|0},${c[1]*k|0},${c[2]*k|0})`;
 const wallTex=ctex(512,544,(g,w,h)=>{
-  g.fillStyle='#cdb862';g.fillRect(0,0,w,h);
-  for(let x=0;x<w;x+=32){g.fillStyle=(x/32)%2?'rgba(255,240,170,.10)':'rgba(120,96,30,.07)';g.fillRect(x,0,32,h)}
-  g.strokeStyle='rgba(110,88,30,.22)';g.lineWidth=2;
-  for(let y=10;y<h;y+=34)for(let x=16;x<w;x+=64){const o=((y/34|0)%2)*32;g.beginPath();g.moveTo(x+o-7,y+6);g.lineTo(x+o,y);g.lineTo(x+o+7,y+6);g.stroke()}
-  for(let i=0;i<9000;i++){g.fillStyle=`rgba(${TR()<.5?'60,48,10':'255,245,200'},${TR()*.05})`;g.fillRect(TR()*w,TR()*h,2,2)}
-  for(let i=0;i<14;i++){const x=TR()*w,y=TR()*h,r=20+TR()*80;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(110,80,20,${.08+TR()*.12})`);gr.addColorStop(1,'rgba(110,80,20,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)}
-  const bg=g.createLinearGradient(0,h*.78,0,h);bg.addColorStop(0,'rgba(90,64,20,0)');bg.addColorStop(1,'rgba(80,56,18,.45)');g.fillStyle=bg;g.fillRect(0,h*.78,w,h*.22);
-  for(let i=0;i<6;i++){const x=TR()*w;const gr=g.createLinearGradient(x,h*.6,x,h);gr.addColorStop(0,'rgba(90,64,22,0)');gr.addColorStop(1,'rgba(90,64,22,.35)');g.fillStyle=gr;g.fillRect(x-10-TR()*20,h*.6,20+TR()*40,h*.4)}
-  const tg=g.createLinearGradient(0,0,0,h*.15);tg.addColorStop(0,'rgba(80,60,20,.25)');tg.addColorStop(1,'rgba(80,60,20,0)');g.fillStyle=tg;g.fillRect(0,0,w,h*.15);
-  g.fillStyle='rgba(90,70,20,.25)';g.fillRect(0,0,2,h);
+  g.fillStyle=rgbs(PAL.wall);g.fillRect(0,0,w,h);
+  for(let x=0;x<w;x+=16){g.fillStyle=(x/16)%2?'rgba(255,248,215,.045)':'rgba(80,58,12,.04)';g.fillRect(x,0,16,h)}
+  for(let x=0;x<w;x+=64){g.fillStyle='rgba(90,66,18,.06)';g.fillRect(x,0,1.5,h)}
+  for(let i=0;i<14000;i++){g.fillStyle=`rgba(${TR()<.5?'70,52,12':'255,246,210'},${TR()*.05})`;g.fillRect(TR()*w,TR()*h,1.5,1.5)}
+  for(let i=0;i<5;i++){const x=TR()*w,y=TR()*h,r=30+TR()*70;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(100,72,18,${.04+TR()*.06})`);gr.addColorStop(1,'rgba(100,72,18,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)}
+  const bg=g.createLinearGradient(0,h*.8,0,h);bg.addColorStop(0,'rgba(80,58,16,0)');bg.addColorStop(1,'rgba(80,58,16,.25)');g.fillStyle=bg;g.fillRect(0,h*.8,w,h*.2);
+  const tg=g.createLinearGradient(0,0,0,h*.12);tg.addColorStop(0,'rgba(80,60,20,.18)');tg.addColorStop(1,'rgba(80,60,20,0)');g.fillStyle=tg;g.fillRect(0,0,w,h*.12);
 });
 const carpetTex=ctex(512,512,(g,w,h)=>{
-  g.fillStyle='#8e7a40';g.fillRect(0,0,w,h);
-  for(let i=0;i<40000;i++){g.fillStyle=`rgba(${TR()<.5?'40,30,8':'200,180,110'},${TR()*.09})`;g.fillRect(TR()*w,TR()*h,2,2)}
-  for(let i=0;i<9;i++){const x=TR()*w,y=TR()*h,r=30+TR()*110;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(50,38,12,${.18+TR()*.2})`);gr.addColorStop(.7,`rgba(50,38,12,${.08})`);gr.addColorStop(1,'rgba(50,38,12,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)}
+  g.fillStyle=rgbs(PAL.carpet,.93);g.fillRect(0,0,w,h);
+  for(let i=0;i<46000;i++){g.fillStyle=`rgba(${TR()<.5?'70,52,20':'235,210,150'},${TR()*.08})`;g.fillRect(TR()*w,TR()*h,1.6,1.6)}
+  for(let i=0;i<6;i++){const x=TR()*w,y=TR()*h,r=30+TR()*100;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(70,52,18,${.08+TR()*.1})`);gr.addColorStop(1,'rgba(70,52,18,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)}
 },[GW*CS/3.2,GH*CS/3.2]);
 const ceilTex=ctex(512,512,(g,w,h)=>{
-  const t=w/4;for(let y=0;y<4;y++)for(let x=0;x<4;x++){const s=200+TR()*14;g.fillStyle=`rgb(${s},${s-8},${s-34})`;g.fillRect(x*t,y*t,t,t);
-    for(let i=0;i<120;i++){g.fillStyle='rgba(80,70,40,.25)';g.fillRect(x*t+TR()*t,y*t+TR()*t,2,2)}
-    if(TR()<.18){const gr=g.createRadialGradient(x*t+t/2,y*t+t/2,0,x*t+t/2,y*t+t/2,t*.6);gr.addColorStop(0,'rgba(120,90,40,.45)');gr.addColorStop(1,'rgba(120,90,40,0)');g.fillStyle=gr;g.fillRect(x*t,y*t,t,t)}}
-  g.fillStyle='#8a836a';for(let i=0;i<=4;i++){g.fillRect(i*t-3,0,6,h);g.fillRect(0,i*t-3,w,6)}
+  const t=w/4;for(let y=0;y<4;y++)for(let x=0;x<4;x++){const k=.96+TR()*.07;g.fillStyle=rgbs(PAL.ceil,k);g.fillRect(x*t,y*t,t,t);
+    for(let i=0;i<160;i++){g.fillStyle='rgba(90,70,30,.18)';g.fillRect(x*t+TR()*t,y*t+TR()*t,1.5,1.5)}
+    if(TR()<.12){const gr=g.createRadialGradient(x*t+t/2,y*t+t/2,0,x*t+t/2,y*t+t/2,t*.6);gr.addColorStop(0,'rgba(110,80,30,.3)');gr.addColorStop(1,'rgba(110,80,30,0)');g.fillStyle=gr;g.fillRect(x*t,y*t,t,t)}}
+  g.fillStyle=rgbs(PAL.ceil,.72);for(let i=0;i<=4;i++){g.fillRect(i*t-2,0,4,h);g.fillRect(0,i*t-2,w,4)}
 },[GW,GH]);
 const noteTex=ctex(256,340,(g,w,h)=>{g.fillStyle='#e8e1c8';g.fillRect(0,0,w,h);g.strokeStyle='rgba(80,110,180,.35)';for(let y=40;y<h;y+=22){g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke()}
   g.strokeStyle='rgba(40,40,70,.75)';g.lineWidth=2.4;for(let y=58;y<h-20;y+=22){g.beginPath();let x=18;g.moveTo(x,y);while(x<w-30-TR()*40){x+=6+TR()*10;g.lineTo(x,y-3+TR()*6)}g.stroke()}
@@ -596,14 +597,19 @@ function buildProps(){
 /* ============ WORLD ASSETS: rooms cut out of the scanned backrooms model, and furniture ============ */
 // Each chunk is a rectangle cut out of backrooms_vr (asset metres, x/z). Its perimeter walls are cut away and replaced by
 // our own grid walls; everything inside (partitions, pillars, arches, counters, armchairs, tables) is kept.
-const CHUNK_DEFS=[
-  {name:'arch hall',crop:[-68.6,-55.45,-4.25,15.05],w:5,h:7,big:true},
-  {name:'offices',crop:[-54.5,-38.2,-4.25,15.05],w:6,h:7,big:true},
-  {name:'partition hall',crop:[-36.6,-17.1,-4.25,14.95],w:7,h:7,big:true},
-  {name:'lounge',crop:[-68.6,-63.4,8.0,15.05],w:2,h:3},
-  {name:'colonnade',crop:[-62.6,-57.6,1.6,15.05],w:2,h:5},
-  {name:'alcove',crop:[-47.6,-38.2,-4.25,3.55],w:3,h:3},
-  {name:'partitions',crop:[-36.6,-26.4,4.4,14.95],w:4,h:4}];
+const CHUNK_DEFS=[// wt: how often it's picked; arch rooms come up the most
+  {name:'arch hall',crop:[-68.6,-55.45,-4.25,15.05],w:5,h:7,big:true,wt:3},
+  {name:'arch wing',crop:[-63.5,-55.45,-4.25,15.05],w:3,h:7,big:true,wt:3},
+  {name:'arch lounge',crop:[-68.6,-57.6,4.5,15.05],w:4,h:4,wt:3},
+  {name:'short arches',crop:[-63.5,-55.45,6.0,15.05],w:3,h:3,wt:3},
+  {name:'colonnade',crop:[-62.6,-57.6,1.6,15.05],w:2,h:5,wt:3},
+  {name:'offices',crop:[-54.5,-38.2,-4.25,15.05],w:6,h:7,big:true,wt:1},
+  {name:'counter room',crop:[-54.5,-38.2,3.7,15.05],w:6,h:4,wt:1.2},
+  {name:'partition hall',crop:[-36.6,-17.1,-4.25,14.95],w:7,h:7,big:true,wt:1},
+  {name:'side corridor',crop:[-23.6,-17.1,-4.25,14.95],w:3,h:7,wt:1},
+  {name:'lounge',crop:[-68.6,-63.4,8.0,15.05],w:2,h:3,wt:.4},
+  {name:'alcove',crop:[-47.6,-38.2,-4.25,3.55],w:3,h:3,wt:1},
+  {name:'partitions',crop:[-36.6,-26.4,4.4,14.95],w:4,h:4,wt:1}];
 let CHUNKS=null,PROPT=null,worldReady=false;
 let REGIONS=[],REGC=new Int8Array(32*32).fill(-1),VOIDC=new Uint8Array(32*32),hX=null,vX=null,XS=[],XB=[],XSH=null,XBH=null,PROPS=[];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -642,8 +648,11 @@ function prepareWorld(gltf){
   const mats={};for(const k in src){const mm=propMaterial(src[k].mat);mm.side=THREE.FrontSide;mm.roughness=/^Moquette/.test(k)?1:.9;
     if(k==='Emission_Red'){mm.color.setHex(0x300000);mm.emissive=new THREE.Color(0xff1a10);mm.emissiveIntensity=1.6;mm.toneMapped=false}
     if(/Translucent|Traslucent|Ceiling_Lamp|^Lamp$/.test(k))mm.side=THREE.DoubleSide;mats[k]=mm}
+  const lin=c=>new THREE.Color(c[0]/255,c[1]/255,c[2]/255).convertSRGBToLinear();
   const texColor=(t,fb)=>{try{const c=document.createElement('canvas');c.width=c.height=48;const g=c.getContext('2d');g.drawImage(t.image,0,0,48,48);const d=g.getImageData(0,0,48,48).data;let r=0,gg=0,b=0,n=0;
     for(let i=0;i<d.length;i+=4){if(d[i]+d[i+1]+d[i+2]<90)continue;r+=d[i];gg+=d[i+1];b+=d[i+2];n++}return n?new THREE.Color(r/n/255,gg/n/255,b/n/255).convertSRGBToLinear():fb}catch(e){return fb}};
+  for(const k in mats){const pal=/^Wall_/.test(k)?PAL.wall:/^Moquette/.test(k)?PAL.carpet:/^Ceiling_\d/.test(k)?PAL.ceil:null;if(!pal||!mats[k].map)continue;
+    const got=texColor(mats[k].map,null);if(!got)continue;const want=lin(pal);mats[k].color.setRGB(clamp(want.r/Math.max(got.r,.02),.4,2.5),clamp(want.g/Math.max(got.g,.02),.4,2.5),clamp(want.b/Math.max(got.b,.02),.4,2.5))}
   for(const def of CHUNK_DEFS){try{const[xa,xb,za,zb]=def.crop;const tri={};let topY=-1e9;
     for(const k in src){const V=src[k].v,out=[];
       for(let i=0;i<V.length;i+=3){let p=[V[i],V[i+1],V[i+2]];
@@ -683,23 +692,30 @@ function prepareWorld(gltf){
     CHUNKS.push(Object.assign({},def,{geo,segs,boxes,mats,wallColor}))}catch(e){console.warn('Room chunk failed',def.name,e)}}
 }
 // chunk-normalised (s,t) -> world (x,z) for a placed region
-function regionXZ(R,s,t){let u,v;switch(R.rot){case 1:u=1-t;v=s;break;case 2:u=1-s;v=1-t;break;case 3:u=t;v=1-s;break;default:u=s;v=t}
+function regionXZ(R,s,t){if(R.mir)s=1-s;let u,v;switch(R.rot){case 1:u=1-t;v=s;break;case 2:u=1-s;v=1-t;break;case 3:u=t;v=1-s;break;default:u=s;v=t}
   return[R.x0*CS+WT/2+u*(R.w*CS-WT),R.y0*CS+WT/2+v*(R.h*CS-WT)]}
-function regionN(R,nx,nz){switch(R.rot){case 1:return[-nz,nx];case 2:return[-nx,-nz];case 3:return[nz,-nx];default:return[nx,nz]}}
+function regionN(R,nx,nz){if(R.mir)nx=-nx;switch(R.rot){case 1:return[-nz,nx];case 2:return[-nx,-nz];case 3:return[nz,-nx];default:return[nx,nz]}}
 // ---- carve the chunk rooms into the grid (called from generate, before doorways)
 function carveRegions(){
   REGIONS=[];REGC=new Int8Array(GW*GH).fill(-1);if(!CHUNKS||!CHUNKS.length)return;
-  const big=shuffle(CHUNKS.filter(c=>c.big)).slice(0,2),small=shuffle(CHUNKS.filter(c=>!c.big)).slice(0,3);
-  for(const ch of[...big,...small]){
-    for(let t=0;t<300;t++){const rot=rnd()*4|0;const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;const x0=1+(rnd()*(GW-w-1)|0),y0=1+(rnd()*(GH-h-1)|0);
-      if(ch===big[0]&&t<200){const dx=Math.max(x0-START.x,0,START.x-(x0+w-1)),dy=Math.max(y0-START.y,0,START.y-(y0+h-1));if(Math.max(dx,dy)>6)continue}
-      if(x0+w>GW-1||y0+h>GH-1)continue;
-      if(START.x>=x0-3&&START.x<x0+w+3&&START.y>=y0-3&&START.y<y0+h+3)continue;
-      let bad=false;for(let y=y0-1;y<=y0+h&&!bad;y++)for(let x=x0-1;x<=x0+w;x++)if(inCell(x,y)&&REGC[y*GW+x]>=0){bad=true;break}if(bad)continue;
-      const id=REGIONS.length;const R={id,ch,rot,x0,y0,w,h};REGIONS.push(R);
-      for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++){REGC[y*GW+x]=id;if(x>x0)vE[vI(x,y)]=0;if(y>y0)hE[hI(x,y)]=0}
-      for(let x=x0;x<x0+w;x++){hE[hI(x,y0)]=1;hE[hI(x,y0+h)]=1}for(let y=y0;y<y0+h;y++){vE[vI(x0,y)]=1;vE[vI(x0+w,y)]=1}
-      break}}}
+  const tot=CHUNKS.reduce((a,c)=>a+(c.wt||1),0);const wpick=list=>{const t0=list.reduce((a,c)=>a+(c.wt||1),0);let x=rnd()*t0;for(const c of list){x-=c.wt||1;if(x<=0)return c}return list[list.length-1]};
+  const fits=(x0,y0,w,h)=>{if(x0<1||y0<1||x0+w>GW-1||y0+h>GH-1)return false;if(START.x>=x0-2&&START.x<x0+w+2&&START.y>=y0-2&&START.y<y0+h+2)return false;
+    for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++)if(REGC[y*GW+x]>=0)return false;return true};
+  const used=new Map();const capOf=ch=>ch.name==='lounge'?2:ch.big?7:9;const can=ch=>(used.get(ch)||0)<capOf(ch);
+  const place=(ch,rot,mir,x0,y0)=>{used.set(ch,(used.get(ch)||0)+1);const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;const id=REGIONS.length;if(id>120)return;const R={id,ch,rot,mir,x0,y0,w,h};REGIONS.push(R);
+    for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++){REGC[y*GW+x]=id;if(x>x0)vE[vI(x,y)]=0;if(y>y0)hE[hI(x,y)]=0}
+    for(let x=x0;x<x0+w;x++){hE[hI(x,y0)]=1;hE[hI(x,y0+h)]=1}for(let y=y0;y<y0+h;y++){vE[vI(x0,y)]=1;vE[vI(x0+w,y)]=1}};
+  const bigs=CHUNKS.filter(c=>c.big);
+  // one big room right next to where you start
+  for(let t=0;t<400;t++){const ch=wpick(bigs),rot=rnd()*4|0,mir=rnd()<.5;const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;const x0=1+(rnd()*(GW-w-1)|0),y0=1+(rnd()*(GH-h-1)|0);
+    const dx=Math.max(x0-START.x,0,START.x-(x0+w-1)),dy=Math.max(y0-START.y,0,START.y-(y0+h-1));if(Math.max(dx,dy)>4)continue;if(fits(x0,y0,w,h)){place(ch,rot,mir,x0,y0);break}}
+  // then big rooms anywhere, then everything else packed tightly into the gaps
+  for(let t=0;t<900;t++){const bl=bigs.filter(can);if(!bl.length)break;const ch=wpick(bl),rot=rnd()*4|0,mir=rnd()<.5;const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;const x0=1+(rnd()*(GW-w-1)|0),y0=1+(rnd()*(GH-h-1)|0);if(fits(x0,y0,w,h))place(ch,rot,mir,x0,y0)}
+  const order=[];for(let y=1;y<GH-1;y++)for(let x=1;x<GW-1;x++)order.push([x,y]);
+  for(let pass=0;pass<3;pass++){shuffle(order);
+    for(const[x0,y0]of order){if(REGC[y0*GW+x0]>=0)continue;const ch=wpick(CHUNKS.filter(can));const rot=rnd()*4|0,mir=rnd()<.5;const w=rot%2?ch.h:ch.w,h=rot%2?ch.w:ch.h;if(can(ch)&&fits(x0,y0,w,h)){place(ch,rot,mir,x0,y0);continue}
+      // try the smaller rooms here instead
+      for(const c2 of shuffle(CHUNKS.filter(c=>!c.big&&can(c)).slice())){const r2=rnd()*4|0;const w2=r2%2?c2.h:c2.w,h2=r2%2?c2.w:c2.h;if(fits(x0,y0,w2,h2)){place(c2,r2,rnd()<.5,x0,y0);break}}}}}
 // ---- extra colliders (chunk walls, counters, furniture) and the nav edges they block
 function segHitSeg(ax,az,bx,bz,cx,cz,dx,dz){const r1=(bx-ax)*(cz-az)-(bz-az)*(cx-ax),r2=(bx-ax)*(dz-az)-(bz-az)*(dx-ax);if(r1*r2>0)return false;const r3=(dx-cx)*(az-cz)-(dz-cz)*(ax-cx),r4=(dx-cx)*(bz-cz)-(dz-cz)*(bx-cx);return r3*r4<=0}
 function segHitBox(ax,az,bx,bz,B,pad){const l=(x,z)=>[(x-B.x)*B.c+(z-B.z)*B.s,-(x-B.x)*B.s+(z-B.z)*B.c];const[p,q]=l(ax,az),[r,s]=l(bx,bz);const hx=B.hx+pad,hz=B.hz+pad;
@@ -726,21 +742,35 @@ function computeNavX(){
     const S=XSH[c];if(S)for(const i of S){const s=XS[i];closestOnSeg(cx,cz,s.ax,s.az,s.bx,s.bz,_cp);if(Math.hypot(cx-_cp.x,cz-_cp.z)<.35)VOIDC[c]=2}
     const Bs=XBH[c];if(Bs)for(const i of Bs){if(boxDist(cx,cz,XB[i])<.3)VOIDC[c]=2}}}
 // region doors: open 2-4 boundary edges into the region's main open area; cut-off pockets become void
+// region doors: rooms may sit wall-to-wall, so a door can open into the maze or straight into the next room.
+// Cut-off pockets inside a room become void; later, any room still unreachable gets an extra door.
+let RMAIN=null;
 function regionDoors(){
+  RMAIN=new Int8Array(GW*GH);
   for(const R of REGIONS){const cells=[];for(let y=R.y0;y<R.y0+R.h;y++)for(let x=R.x0;x<R.x0+R.w;x++)cells.push([x,y]);
     const comp=new Int16Array(GW*GH).fill(-1);let best=-1,bestN=0,id=0;
     for(const[x,y]of cells){const c=y*GW+x;if(comp[c]>=0||VOIDC[c])continue;const q=[c];comp[c]=id;let n=0;
       while(q.length){const k=q.pop();n++;const kx=k%GW,ky=(k/GW)|0;for(const[dx,dy]of D4){const nx=kx+dx,ny=ky+dy;if(!inCell(nx,ny)||REGC[ny*GW+nx]!==R.id||!edgeOpen(kx,ky,dx,dy))continue;const nc=ny*GW+nx;if(comp[nc]<0&&!VOIDC[nc]){comp[nc]=id;q.push(nc)}}}
       if(n>bestN){bestN=n;best=id}id++}
-    for(const[x,y]of cells){const c=y*GW+x;if(comp[c]!==best)VOIDC[c]=Math.max(VOIDC[c],1)}
-    const cand=[];for(const[x,y]of cells){const c=y*GW+x;if(comp[c]!==best||VOIDC[c])continue;
-      for(const[dx,dy]of D4){const nx=x+dx,ny=y+dy;if(REGC[ny*GW+nx]===R.id||!inCell(nx,ny)||ny<1||nx<1||nx>=GW-1||ny>=GH-1||REGC[ny*GW+nx]>=0)continue;
-        if(dx===0&&R.w>2&&(x===R.x0||x===R.x0+R.w-1))continue;if(dy===0&&R.h>2&&(y===R.y0||y===R.y0+R.h-1))continue;// not right in a corner
-        cand.push({x,y,dx,dy,side:dx?(dx>0?1:3):(dy>0?2:0)})}}
-    shuffle(cand);const used=new Set();let n=0;const want=R.w*R.h>20?4:2;
-    for(const c of cand){if(n>=want)break;if(used.has(c.side)&&n<3)continue;used.add(c.side);
-      setEdge(c.x,c.y,c.dx,c.dy,0);if(c.dy)hD[hI(c.x,c.dy>0?c.y+1:c.y)]=1;else vD[vI(c.dx>0?c.x+1:c.x,c.y)]=1;n++}
+    for(const[x,y]of cells){const c=y*GW+x;if(comp[c]!==best)VOIDC[c]=Math.max(VOIDC[c],1);else RMAIN[c]=1}}
+  const pairs=new Map();
+  for(const R of REGIONS){const cand=regionDoorCands(R,()=>true);shuffle(cand);const used=new Set();let n=0;const want=R.w*R.h>20?4:R.w*R.h>8?3:2;
+    for(const c of cand){if(n>=want)break;if(used.has(c.side)&&n<3)continue;const o=REGC[c.ny*GW+c.nx];if(o>=0){const key=Math.min(o,R.id)+'_'+Math.max(o,R.id);if((pairs.get(key)||0)>=1)continue;pairs.set(key,(pairs.get(key)||0)+1)}
+      used.add(c.side);openDoor(c);n++}
     R.doors=n}}
+function regionDoorCands(R,ok){const cand=[];
+  for(let y=R.y0;y<R.y0+R.h;y++)for(let x=R.x0;x<R.x0+R.w;x++){const c=y*GW+x;if(!RMAIN[c]||VOIDC[c])continue;
+    for(const[dx,dy]of D4){const nx=x+dx,ny=y+dy;if(!inCell(nx,ny)||REGC[ny*GW+nx]===R.id||ny<1||nx<1||nx>=GW-1||ny>=GH-1)continue;const nc=ny*GW+nx;
+      if(VOIDC[nc]||(REGC[nc]>=0&&!RMAIN[nc]))continue;if(!realWall(x,y,dx,dy))continue;
+      if(dx===0&&R.w>2&&(x===R.x0||x===R.x0+R.w-1))continue;if(dy===0&&R.h>2&&(y===R.y0||y===R.y0+R.h-1))continue;// not right in a corner
+      if(!ok(nc))continue;cand.push({x,y,dx,dy,nx,ny,side:dx?(dx>0?1:3):(dy>0?2:0)})}}
+  return cand}
+function openDoor(c){setEdge(c.x,c.y,c.dx,c.dy,0);if(c.dy)hD[hI(c.x,c.dy>0?c.y+1:c.y)]=1;else vD[vI(c.dx>0?c.x+1:c.x,c.y)]=1}
+function connectRegions(){// keep adding doors until every room can be reached from the start
+  for(let it=0;it<60;it++){const d=cellBFS(START.x,START.y);let added=false;
+    for(const R of REGIONS){let reached=false,any=false;for(let y=R.y0;y<R.y0+R.h&&!reached;y++)for(let x=R.x0;x<R.x0+R.w;x++){const c=y*GW+x;if(!RMAIN[c])continue;any=true;if(d[c]>=0){reached=true;break}}
+      if(reached||!any)continue;const cand=regionDoorCands(R,nc=>d[nc]>=0);if(cand.length){openDoor(pick(cand));R.doors=(R.doors||0)+1;added=true}}
+    if(!added)break}}
 // ---- the scattered furniture (decided at generate time so it can block the right things)
 const PROP_SET=[['ladderchair',13,.45],['deskchair',9,.45],['dresser',6,.3],['armchair',3,.2],['armchair2',3,.2],['sofa',3,.12],['table',4,.35]];
 function realWall(x,y,dx,dy){const nx=x+dx,ny=y+dy;if(!inCell(nx,ny))return true;if(dx===1)return!!vE[vI(x+1,y)];if(dx===-1)return!!vE[vI(x,y)];if(dy===1)return!!hE[hI(x,y+1)];return!!hE[hI(x,y)]}
@@ -759,7 +789,8 @@ function tryProp(key,x,z,yaw,tipped,opt){
   let hit=false;nearSegments(bx,bz,(ax,az,ex,ez)=>{if(!hit&&segHitBox(ax,az,ex,ez,B,WT/2+.03))hit=true});if(hit)return null;
   for(const pl of pillars)if(boxDist(pl.x,pl.z,B)<.32)return null;
   for(const o of XB)if(Math.hypot(o.x-B.x,o.z-B.z)<Math.hypot(o.hx,o.hz)+Math.hypot(B.hx,B.hz)-(opt&&opt.tight?.25:-.15))return null;
-  const[cx,cy2]=cellOf(bx,bz);if(REGC[cy2*GW+cx]>=0)return null;
+  const[cx,cy2]=cellOf(bx,bz);if(VOIDC[cy2*GW+cx])return null;
+  if(REGC[cy2*GW+cx]>=0){const rr=Math.hypot(B.hx,B.hz)+.3;for(const sg of XS){if(Math.max(sg.ax,sg.bx)<bx-rr||Math.min(sg.ax,sg.bx)>bx+rr||Math.max(sg.az,sg.bz)<bz-rr||Math.min(sg.az,sg.bz)>bz+rr)continue;if(segHitBox(sg.ax,sg.az,sg.bx,sg.bz,B,.12))return null}}
   if(!(opt&&opt.center)){const ccx=(cx+.5)*CS,ccz=(cy2+.5)*CS;if(boxDist(ccx,ccz,B)<.42)return null}
   for(let y=cy2-1;y<=cy2+1;y++)for(let i=cx-1;i<=cx+1;i++){if(i<0||y<0||i>=GW||y>=GH)continue;
     if(hD[hI(i,y)]&&boxDist((i+.5)*CS,y*CS,B)<.7)return null;if(y+1<=GH&&hD[hI(i,y+1)]&&boxDist((i+.5)*CS,(y+1)*CS,B)<.7)return null;
@@ -767,7 +798,7 @@ function tryProp(key,x,z,yaw,tipped,opt){
   XB.push(B);const P={key,x,z,y:-bb.min.y+.004,yaw,q,box:B};PROPS.push(P);return P}
 function planProps(){
   PROPS=[];if(!PROPT)return;
-  const freeCell=()=>{for(let t=0;t<40;t++){const x=1+(rnd()*(GW-2)|0),y=1+(rnd()*(GH-2)|0);if(REGC[y*GW+x]>=0||VOIDC[y*GW+x])continue;if(Math.abs(x-START.x)<3&&Math.abs(y-START.y)<3)continue;return[x,y]}return null};
+  const freeCell=()=>{for(let t=0;t<40;t++){const x=1+(rnd()*(GW-2)|0),y=1+(rnd()*(GH-2)|0);if(VOIDC[y*GW+x])continue;if(Math.abs(x-START.x)<3&&Math.abs(y-START.y)<3)continue;return[x,y]}return null};
   // a few furnished corners: a sofa against a wall with a low table and armchairs, like an abandoned waiting room
   for(let k=0;k<3;k++)for(let t=0;t<60;t++){const c=freeCell();if(!c)break;const[x,y]=c;const ws=D4.filter(([dx,dy])=>realWall(x,y,dx,dy)&&edgeOpen(x,y,-dx,-dy));if(!ws.length)continue;const[dx,dy]=pick(ws);
     const T=PROPT.sofa;if(!T)break;const yaw=Math.atan2(-dx,-dy)-T.backYaw+Math.PI;// back against the wall
@@ -794,14 +825,16 @@ function roomWallMaterial(ch){// a tiling wallpaper in the room's own colour, fo
     roomWallTex[ch.name]=new THREE.MeshStandardMaterial({map:t,roughness:.9})}
   return roomWallTex[ch.name]}
 function buildRegionMeshes(){
+  const acc={};
   for(const R of REGIONS){const ch=R.ch;
-    for(const k in ch.geo){const A=ch.geo[k],n=A.length/8,isWall=/^Wall_/.test(k);const pos=new Float32Array(n*3),nrm=new Float32Array(n*3),uv=new Float32Array(n*2);
-      for(let i=0;i<n;i++){const o=i*8;const[x,z]=regionXZ(R,A[o],A[o+2]);const[nx,nz]=regionN(R,A[o+3],A[o+5]);pos[i*3]=x;pos[i*3+1]=A[o+1];pos[i*3+2]=z;nrm[i*3]=nx;nrm[i*3+1]=A[o+4];nrm[i*3+2]=nz;uv[i*2]=A[o+6];uv[i*2+1]=A[o+7]}
-      if(isWall)for(let t=0;t<n;t+=3){// flat normals from the winding: the scan's own normals disagree with it on arches and corners
-        const i0=t*3,i1=(t+1)*3,i2=(t+2)*3;const ux=pos[i1]-pos[i0],uy=pos[i1+1]-pos[i0+1],uz=pos[i1+2]-pos[i0+2],vx=pos[i2]-pos[i0],vy=pos[i2+1]-pos[i0+1],vz=pos[i2+2]-pos[i0+2];
-        let fx=uy*vz-uz*vy,fy=uz*vx-ux*vz,fz=ux*vy-uy*vx;const fl=Math.hypot(fx,fy,fz)||1;fx/=fl;fy/=fl;fz/=fl;for(let k2=0;k2<3;k2++){nrm[(t+k2)*3]=fx;nrm[(t+k2)*3+1]=fy;nrm[(t+k2)*3+2]=fz}}
-      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('normal',new THREE.BufferAttribute(nrm,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.computeBoundingSphere();
-      const mesh=new THREE.Mesh(g,ch.mats[k]);mesh.castShadow=isWall||/Furniture|ArmChair|Wood/.test(k);mesh.receiveShadow=!/Emission/.test(k);mesh.userData.regionGeo=true;levelGroup.add(mesh)}}}
+    for(const k in ch.geo){const A=ch.geo[k],n=A.length/8,isWall=/^Wall_/.test(k);const e=acc[k]||(acc[k]={P:[],N:[],U:[],mat:ch.mats[k],wall:isWall});const P=e.P,N=e.N,U=e.U;
+      for(let t=0;t<n;t+=3){const ord=R.mir?[0,2,1]:[0,1,2];const tri=[];
+        for(const kk of ord){const o=(t+kk)*8;const[x,z]=regionXZ(R,A[o],A[o+2]);const[nx,nz]=regionN(R,A[o+3],A[o+5]);tri.push([x,A[o+1],z,nx,A[o+4],nz,A[o+6],A[o+7]])}
+        if(isWall){// flat normals from the winding: the scan's own normals disagree with it on arches and corners
+          const[a,b,c]=tri;const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];let fx=uy*vz-uz*vy,fy=uz*vx-ux*vz,fz=ux*vy-uy*vx;const fl=Math.hypot(fx,fy,fz)||1;for(const v of tri){v[3]=fx/fl;v[4]=fy/fl;v[5]=fz/fl}}
+        for(const v of tri){P.push(v[0],v[1],v[2]);N.push(v[3],v[4],v[5]);U.push(v[6],v[7])}}}}
+  for(const k in acc){const e=acc[k];if(!e.P.length)continue;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(e.P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(e.N,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(e.U,2));g.computeBoundingSphere();
+    const mesh=new THREE.Mesh(g,e.mat);mesh.castShadow=e.wall||/Furniture|ArmChair|Wood/.test(k);mesh.receiveShadow=!/Emission/.test(k);mesh.userData.regionGeo=true;mesh.frustumCulled=false;levelGroup.add(mesh)}}
 function buildPropMeshes(){
   if(!PROPS.length||!PROPT)return;const by={};PROPS.forEach(p=>(by[p.key]=by[p.key]||[]).push(p));const m=new THREE.Matrix4(),q=new Q(),one=new V3(1,1,1);
   for(const key in by){const T=PROPT[key],L=by[key];
@@ -813,19 +846,13 @@ function buildLevel(){
   const geo=new THREE.BoxGeometry(CS+WT,WH,WT);
   const regOf=(x,y)=>inCell(x,y)?REGC[y*GW+x]:-1;const special=[];// [matrix index, region id, +z side?]
   const walls=new THREE.InstancedMesh(geo,wallMat,n);walls.receiveShadow=true;walls.castShadow=true;
-  const base=new THREE.InstancedMesh(new THREE.BoxGeometry(CS+WT+.02,.11,WT+.035),new THREE.MeshStandardMaterial({color:0x4a3a1e,roughness:.6}),n);
+  const base=new THREE.InstancedMesh(new THREE.BoxGeometry(CS+WT+.02,.11,WT+.035),new THREE.MeshStandardMaterial({color:PAL.skirt,roughness:.6}),n);
   const m=new THREE.Matrix4(),qy=new Q().setFromAxisAngle(UP,Math.PI/2),q0=new Q(),one=new V3(1,1,1);let k=0;
   const mark=(a,b,pos,q)=>{if(a>=0&&b<0)special.push([pos,q,a,true]);else if(b>=0&&a<0)special.push([pos,q,b,false])};
   for(let y=0;y<=GH;y++)for(let x=0;x<GW;x++)if(hE[hI(x,y)]){const P=new V3((x+.5)*CS,WH/2,y*CS);mark(regOf(x,y),regOf(x,y-1),P,q0);m.compose(P,q0,one);walls.setMatrixAt(k,m);m.compose(new V3((x+.5)*CS,.055,y*CS),q0,one);base.setMatrixAt(k++,m)}
   for(let y=0;y<GH;y++)for(let x=0;x<=GW;x++)if(vE[vI(x,y)]){const P=new V3(x*CS,WH/2,(y+.5)*CS);mark(regOf(x,y),regOf(x-1,y),P,qy);m.compose(P,qy,one);walls.setMatrixAt(k,m);m.compose(new V3(x*CS,.055,(y+.5)*CS),qy,one);base.setMatrixAt(k++,m)}
   levelGroup.add(walls,base);
-  if(special.length){// a thin skin of the room's wallpaper and its cream skirting on the inside face of the boundary walls
-    const skin=new THREE.PlaneGeometry(CS+WT,WH),skirt=new THREE.BoxGeometry(CS+WT,.1,.012),skirtMat=new THREE.MeshStandardMaterial({color:0xc8b37a,roughness:.6});
-    const byR={};special.forEach(sp=>(byR[sp[2]]=byR[sp[2]]||[]).push(sp));
-    for(const id in byR){const L=byR[id],ch=REGIONS[id].ch;const im=new THREE.InstancedMesh(skin,roomWallMaterial(ch),L.length),sk=new THREE.InstancedMesh(skirt,skirtMat,L.length);
-      L.forEach((sp,i)=>{const[P,q,,plus]=sp;const nrm=new V3(0,0,plus?1:-1).applyQuaternion(q);const qq=q.clone();if(!plus)qq.multiply(new Q().setFromAxisAngle(UP,Math.PI));
-        m.compose(P.clone().addScaledVector(nrm,WT/2+.004),qq,one);im.setMatrixAt(i,m);m.compose(new V3(P.x,.05,P.z).addScaledVector(nrm,WT/2+.01),qq,one);sk.setMatrixAt(i,m)});
-      im.receiveShadow=true;sk.receiveShadow=true;levelGroup.add(im,sk)}}
+
   const tint=new THREE.Color();for(let i=0;i<n;i++){const v=.8+rnd()*.2;walls.setColorAt(i,tint.setRGB(v,v*(.97+rnd()*.03),v*(.9+rnd()*.08)))}walls.instanceColor.needsUpdate=true;
   // doorways
   const L=(CS-DOORW)/2,nd=hD.reduce((a,b)=>a+b,0)+vD.reduce((a,b)=>a+b,0);
