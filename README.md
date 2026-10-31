@@ -22,7 +22,23 @@ You carry the last box down the basement stairs, lean on the wall, and fall thro
 
 ## The level
 
-A new 32×32 maze every tape: yellow wallpaper with uneven wear, doorways cut into the walls, pillar halls, long corridors, missing and fallen ceiling tiles, outlets, vents, damp stains and abandoned office chairs.
+A new 32×32 maze every tape: yellow wallpaper with uneven wear, doorways cut into the walls, pillar halls, long corridors, missing and fallen ceiling tiles, outlets, vents and damp stains.
+
+**Rooms cut from the Backrooms VR scan.** Each tape drops two big rooms and three small ones into the maze, cut out of `backrooms_vr.glb` and turned a random way. They keep the scan's own layout and furniture. Their walls use the same wallpaper as the rest of the level, so they blend in. You enter through two to four doorways.
+
+| Room | What's in it |
+| --- | --- |
+| Arch hall | A row of arched pillars and a pile of armchairs and side tables |
+| Offices | An L-shaped wall block, an alcove and half-height counters |
+| Partition hall | A long wall with a side corridor and thin partitions |
+| Lounge | The armchair pile on its own |
+| Colonnade | A narrow hall along the arches |
+| Alcove | A small side room |
+| Partitions | A corner of short dividing walls |
+
+The cut-out walls block you, the monster and its line of sight; the counters and the furniture block movement but not sight. They also show up in pencil on your map.
+
+**Furniture.** Ladder-back chairs, 70s desk chairs, dressers, sofas, armchairs and low tables are scattered around. Some stand against the walls and some lie knocked over on their sides or backs. A few corners are set up like an abandoned waiting room: a sofa against the wall, a low table and two armchairs. You and the monster both collide with all of it.
 
 ## Harder
 
@@ -115,9 +131,16 @@ Then open http://localhost:8000.
 - `smily_horror_monster.glb`: the monster's model and skeleton
 - `fps_arms.glb`: your arms
 - `camcorder.glb`: the camcorder
+- `world.glb`: what the game actually loads for the rooms and furniture (3.8 MB). It's built from the five models below: textures shrunk, unused parts of the room scan removed, and the desk chair simplified.
+- `backrooms_vr.glb`, `70s_desk_chair.glb`, `backrooms_movie_ladderback_restaurant_chair.glb`, `sofa_-_classic_furniture_set..glb`, `trim_sheet__example_dresser.glb`: the original models
 
 ## Credits
 
 - Monster: "Smily horror monster" (CC BY 4.0), from Sketchfab.
 - Arms: "fps arms" (CC BY 4.0), from Sketchfab.
 - Camcorder: "Camcorder" by omegadarling (CC BY 4.0), from Sketchfab.
+- Rooms: "Backrooms VR" by carlcapu9 (CC BY 4.0), from Sketchfab.
+- "70's desk chair" by iank2z (CC BY 4.0), from Sketchfab.
+- "Backrooms Movie Ladderback Restaurant Chair" by varrocharlie (CC BY 4.0), from Sketchfab.
+- "Sofa - Classic furniture set." by chris_models (CC BY 4.0), from Sketchfab.
+- "Trim Sheet Example Dresser" by Chris Sweetwood (CC BY-SA 4.0), from Sketchfab. The reduced copy of the dresser inside `world.glb` is shared under the same CC BY-SA 4.0 licence.
