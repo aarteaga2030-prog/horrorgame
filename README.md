@@ -47,6 +47,15 @@ The cut-out walls block you, the monster and its line of sight; the counters and
 
 **Furniture.** Ladder-back chairs, 70s desk chairs, dressers, sofas, armchairs and low tables are scattered around. Some stand against the walls and some lie knocked over on their sides or backs. A few corners are set up like an abandoned waiting room: a sofa against the wall, a low table and two armchairs. You and the monster both collide with all of it.
 
+## How it looks
+
+- **Surfaces:** walls, carpet and ceiling tiles get fine 3D surface detail applied in world space, so it lines up on the maze and on the scanned rooms alike. The wallpaper has paper grain and bubbles, the carpet has tufts with a soft fabric sheen at low angles, and the ceiling tiles are pitted and cracked. Recesses read darker and rougher.
+- **Flashlight:** the beam has a real reflector pattern (hot centre, softer ring, faint lens smudges) and sharper shadows. A warm fill light bounces off whatever the beam hits, so the room around the spot isn't pitch black, and dust drifts through the beam.
+- **Corners and contact shadows:** ambient occlusion darkens corners, skirting and the floor under furniture. A soft bloom picks out the brightest highlights.
+- **The monster:** waxy, slightly wet skin with a sheen, and it shadows itself.
+- **Damp patches:** soft, ragged-edged stains on the carpet.
+- **Slower computers:** if the first seconds of play run slow, the game turns off the occlusion, then the bloom, and lowers the shadow detail by itself.
+
 ## Harder
 
 - **Battery:** your flashlight drains its battery, and it flickers more and dims when low. Seven spare camcorder batteries are hidden around the level (look for a tiny green LED).
