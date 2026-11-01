@@ -195,9 +195,7 @@ Then open http://localhost:8000.
 ## Files
 
 - `index.html`: the whole game (Three.js r160 from a CDN, no build step)
-- `smily_horror_monster.glb`: the monster's model and skeleton
-- `fps_arms.glb`: your arms
-- `camcorder.glb`: the camcorder
+- `monster_lite.glb`, `arms_lite.glb`, `camcorder_lite.glb`: what the game loads for the monster, your arms and the camcorder. They're lighter copies of `smily_horror_monster.glb`, `fps_arms.glb` and `camcorder.glb` (the originals), with textures as JPEG, the camcorder mesh simplified from 200k to 24k triangles, and two textures that were cut off at the end of the original files removed.
 - `smile.glb`: level 2's hunter, a simplified copy (1.5 MB) of `the_smile__rigged 2.glb`
 - `world.glb`: what the game actually loads for the rooms and furniture (3.8 MB). It's built from the five models below: textures shrunk, unused parts of the room scan removed, and the desk chair simplified.
 - `backrooms_vr.glb`, `70s_desk_chair.glb`, `backrooms_movie_ladderback_restaurant_chair.glb`, `sofa_-_classic_furniture_set..glb`, `trim_sheet__example_dresser.glb`: the original models
