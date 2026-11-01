@@ -49,6 +49,11 @@ The cut-out walls block you, the monster and its line of sight; the counters and
 
 **Furniture.** Ladder-back chairs, 70s desk chairs, dressers, sofas, armchairs and low tables are scattered around. Some stand against the walls and some lie knocked over on their sides or backs. A few corners are set up like an abandoned waiting room: a sofa against the wall, a low table and two armchairs. You and the monster both collide with all of it.
 
+## Stage select and cutscenes (start menu)
+
+- **STAGE SELECT** jumps straight into level 0, level 2 or level 3 with fresh tapes.
+- **CUTSCENES** replays any scene on its own: the basement intro, the stairwell, the freight lift, climbing out of the window, and the ending film. Each one goes back to the title when it ends (E or tap skips).
+
 ## Settings (start menu)
 
 Both are off by default, and the game remembers your choice in this browser.

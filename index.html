@@ -52,9 +52,14 @@ button:focus-visible{outline:2px solid var(--mustard);outline-offset:3px}
 .tape button{font-family:var(--f-osd);font-size:26px;letter-spacing:.1em;background:var(--osd);color:#111;border:0;padding:8px 22px;cursor:pointer}
 .tape button:hover{background:#fff}
 .tape button:disabled{opacity:.45;cursor:wait}
-.tape .opts{display:flex;gap:10px;flex-wrap:wrap;padding:0 18px 12px}
-.tape button.opt{font-size:20px;padding:5px 14px;background:#2a2a30;color:var(--osd);border:1px solid #55555e}
+.tape .opts{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 10px}
+.tape button.opt{font-size:17px;padding:4px 12px;background:#2a2a30;color:var(--osd);border:1px solid #55555e}
 .tape button.opt[aria-pressed="true"]{background:#b8372d;color:#fff;border-color:#b8372d}
+.tape .menu{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.tape .menu button.opt{text-align:left;width:100%;font-size:22px;padding:8px 14px;cursor:pointer}
+.tape .menu button.opt small{display:block;font-size:15px;opacity:.7;letter-spacing:.04em}
+.tape .menu button.opt:disabled{opacity:.4;cursor:default}
+.tape button.opt.nav{background:#e4dcc3;color:#2b2a30;border-color:#8a8470}
 .tape .fine{font-family:var(--f-osd);font-size:17px;color:#8f8b78}
 .lost{background:#0b0b0e}
 .lost .label{background:#0b0b0e;color:var(--osd);background-image:none;border:2px solid #2c2c3a}
@@ -724,6 +729,7 @@ function makeTemplate(root,metalRe){
   let bx=0,bz=0,n=0;parts.forEach(p=>{const P=p.g.attributes.position;for(let i=0;i<P.count;i+=3){if(P.getY(i)>size.y*.72){bx+=P.getX(i);bz+=P.getZ(i);n++}}});
   const back=n?new V3(bx/n,0,bz/n):new V3(0,0,-1);if(back.length()<.02)back.set(0,0,-1);back.normalize();
   return{parts,size,back,backYaw:Math.atan2(back.x,back.z)}}
+const TEXCOL={"Ceiling_2":[0.3606,0.2191,0.0398],"Ceiling_1":[0.4026,0.2553,0.0505],"Ceiling_Lamp":[0.1324,0.0979,0.037],"Ceiling_3":[0.2876,0.168,0.0204],"Ceiling_4":[0.2604,0.1459,0.0153],"Furniture_1":[0.2006,0.0472,0.0119],"Lamp":[0.2866,0.2044,0.0796],"Socket_1":[0.3225,0.2163,0.0582],"Sensor":[0.1562,0.0819,0.007],"Wall_1":[0.44,0.2928,0.0677],"Window_1":[0.2025,0.1693,0.1133],"Wall_2":[0.5248,0.3522,0.0947],"Translucent":[0.6161,0.6103,0.5477],"Moquette_1":[0.4441,0.2727,0.0769],"Moquette_2":[0.5325,0.3557,0.1295],"Moquette_3":[0.4377,0.2747,0.0806],"Moquette_4":[0.3917,0.239,0.062],"Vent_1":[0.1466,0.0828,0.0081],"Wall_4":[0.2778,0.1562,0.0131],"Withe":[0.4005,0.3086,0.1232],"Wall_3":[0.3521,0.2044,0.021],"Traslucent":[0.5721,0.5643,0.5181],"Wood":[0.2924,0.1052,0.0161],"ArmChair_1":[0.2229,0.1952,0.1061]};
 function prepareWorld(gltf){
   const sc=gltf.scene;sc.updateMatrixWorld(true);const find=n=>{let r=null;sc.traverse(o=>{if(!r&&o.name===n)r=o});return r};
   // ---- furniture templates
@@ -743,10 +749,10 @@ function prepareWorld(gltf){
     if(k==='Emission_Red'){mm.color.setHex(0x300000);mm.emissive=new THREE.Color(0xff1a10);mm.emissiveIntensity=1.6;mm.toneMapped=false}
     if(/Translucent|Traslucent|Ceiling_Lamp|^Lamp$/.test(k))mm.side=THREE.DoubleSide;mats[k]=mm}
   const lin=c=>new THREE.Color(c[0]/255,c[1]/255,c[2]/255).convertSRGBToLinear();
-  const texColor=(t,fb)=>{try{const c=document.createElement('canvas');c.width=c.height=48;const g=c.getContext('2d');g.drawImage(t.image,0,0,48,48);const d=g.getImageData(0,0,48,48).data;let r=0,gg=0,b=0,n=0;
-    for(let i=0;i<d.length;i+=4){if(d[i]+d[i+1]+d[i+2]<90)continue;r+=d[i];gg+=d[i+1];b+=d[i+2];n++}return n?new THREE.Color(r/n/255,gg/n/255,b/n/255).convertSRGBToLinear():fb}catch(e){return fb}};
+  // average colour of each scan texture, measured once offline (reading pixels back from a texture froze iPads for a minute or more)
+  const texColor=(t,fb,k)=>{const c=TEXCOL[k];return c?new THREE.Color(c[0],c[1],c[2]):fb};
   for(const k in mats){const pal=/^Wall_/.test(k)?PAL.wall:/^Moquette/.test(k)?PAL.carpet:/^Ceiling_\d/.test(k)?PAL.ceil:null;if(!pal||!mats[k].map)continue;
-    const got=texColor(mats[k].map,null);if(!got)continue;const want=lin(pal);mats[k].color.setRGB(clamp(want.r/Math.max(got.r,.02),.4,2.5),clamp(want.g/Math.max(got.g,.02),.4,2.5),clamp(want.b/Math.max(got.b,.02),.4,2.5))}
+    const got=texColor(mats[k].map,null,k);if(!got)continue;const want=lin(pal);mats[k].color.setRGB(clamp(want.r/Math.max(got.r,.02),.4,2.5),clamp(want.g/Math.max(got.g,.02),.4,2.5),clamp(want.b/Math.max(got.b,.02),.4,2.5))}
   for(const k in mats){if(/^Wall_/.test(k))envDetail(mats[k],'wall');else if(/^Ceiling_\d/.test(k))envDetail(mats[k],'ceil');
     else if(/^Moquette/.test(k)){const o=mats[k];mats[k]=carpetMaterial(o.map,o.color)}}
   for(const def of CHUNK_DEFS){try{const[xa,xb,za,zb]=def.crop;const tri={};let topY=-1e9;
@@ -784,7 +790,7 @@ function prepareWorld(gltf){
     for(let i=0;i<boxes.length;i++)for(let j=boxes.length-1;j>i;j--){const A=boxes[i],B=boxes[j];const ox=Math.min(A.s1,B.s1)-Math.max(A.s0,B.s0),oz=Math.min(A.t1,B.t1)-Math.max(A.t0,B.t0);
       if(ox>0&&oz>0&&ox*oz>.5*Math.min((A.s1-A.s0)*(A.t1-A.t0),(B.s1-B.s0)*(B.t1-B.t0))){A.s0=Math.min(A.s0,B.s0);A.s1=Math.max(A.s1,B.s1);A.t0=Math.min(A.t0,B.t0);A.t1=Math.max(A.t1,B.t1);A.y0=Math.min(A.y0,B.y0);A.y1=Math.max(A.y1,B.y1);boxes.splice(j,1)}}
     const geo={};for(const k in tri){const T=tri[k],a=new Float32Array(T.length*8);T.forEach((v,i)=>{const s=S(v);a.set([s[0],s[1],s[2],v[3],v[4],v[5],v[6],v[7]],i*8)});geo[k]=a}
-    const wk=Object.keys(tri).filter(k=>/^Wall_/.test(k)).sort((a,b)=>tri[b].length-tri[a].length)[0];const wallColor=wk&&src[wk].mat.map?texColor(src[wk].mat.map,new THREE.Color(.55,.42,.16)):new THREE.Color(.55,.42,.16);
+    const wk=Object.keys(tri).filter(k=>/^Wall_/.test(k)).sort((a,b)=>tri[b].length-tri[a].length)[0];const wallColor=wk&&src[wk].mat.map?texColor(src[wk].mat.map,new THREE.Color(.55,.42,.16),wk):new THREE.Color(.55,.42,.16);
     CHUNKS.push(Object.assign({},def,{geo,segs,boxes,mats,wallColor}))}catch(e){console.warn('Room chunk failed',def.name,e)}}
 }
 // chunk-normalised (s,t) -> world (x,z) for a placed region
@@ -1893,11 +1899,12 @@ function showTitle(){
   <p>You leaned on the basement wall and the wall wasn't there. Now it's damp carpet, dead lights and total dark. The camcorder light is the only light there is.</p>
   <p>Someone was here before you. They left five notes on the walls. Find them, and find the way out. The way out goes down. Something tall in here is always smiling. It cannot move while your light is on it, but your light shows it where you are. It learns how you play.</p>
   <div class="ctrl"><kbd>WASD</kbd>move <kbd>SHIFT</kbd>run <kbd>C</kbd>crouch · look: mouse (click), drag, or <kbd>ARROWS</kbd><br><kbd>E</kbd>read / open <kbd>F</kbd>light on/off <kbd>M</kbd>map · keep the light on it. every flicker, it moves.</div></div>
-  <div class="opts"><button type="button" class="opt" id="optKill" aria-pressed="${SETTINGS.killcam}">KILL CAM: ${SETTINGS.killcam?'ON':'OFF'}</button><button type="button" class="opt" id="optPina" aria-pressed="${SETTINGS.pina}">PINA MODE: ${SETTINGS.pina?'ON':'OFF'}</button></div>
+  <div class="opts"><button type="button" class="opt" id="optKill" aria-pressed="${SETTINGS.killcam}">KILL CAM: ${SETTINGS.killcam?'ON':'OFF'}</button><button type="button" class="opt" id="optPina" aria-pressed="${SETTINGS.pina}">PINA MODE: ${SETTINGS.pina?'ON':'OFF'}</button><button type="button" class="opt nav" id="optStages">STAGE SELECT ▸</button><button type="button" class="opt nav" id="optCuts">CUTSCENES ▸</button></div>
   <div class="actions"><span class="fine">HEADPHONES. LIGHTS OFF.</span><button type="button" data-go id="goTitle" ${modelReady?'':'disabled'}>${modelReady?'▶ PLAY':'LOADING…'}</button></div></div>`);
   $('goTitle').onclick=()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();newGame()};
   const tog=(id,key,label)=>{const b=$(id);b.onclick=()=>{SETTINGS[key]=!SETTINGS[key];saveSettings();b.textContent=label+': '+(SETTINGS[key]?'ON':'OFF');b.setAttribute('aria-pressed',SETTINGS[key]);if(key==='pina')applyPina()}};
   tog('optKill','killcam','KILL CAM');tog('optPina','pina','PINA MODE');
+  $('optStages').onclick=()=>stageMenu();$('optCuts').onclick=()=>cutMenu();
 }
 function newGame(){H.games++;saveH();finaleReset();endCleanup();KC.buf=[];applyPina();clearLevelItems();G.lvl=0;G.brk=0;exitLight.color.setHex(0xff2a1a);
   RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.light=true;G.flickOff=0;G.notes=0;G.trail=[];G.sights=[];G.hides=[];G.hideT=0;G.heat=new Float32Array(GW*GH);G.fq=[];G.batt=100;G.tapes=3;G.deaths=0;G.exitOpen=false;exitDoor=null;exitLight.intensity=0;G.time=0;G.explored=new Uint8Array(GW*GH);
@@ -2311,7 +2318,7 @@ function frame(dt){
   updateLights(dt);if(G.state==='killcam'){flash.intensity=0;spill.intensity=0}
   if(G.lvl===0&&CR&&MON.visible&&!G.paused&&G.state!=='ending'&&G.state!=='killcam'&&!(G.state==='intro'&&INTRO.monFrozen)&&!(MON.frozen&&G.state==='play')){if(computePose(dt))CR.apply(POSE);if(!CR.all.every(b=>Number.isFinite(b.quaternion.x+b.quaternion.w+b.position.x))){console.warn('monster pose went bad; reset');CR.restore();snapLimbs()}if(AI.spot&&(AI.state==='peek'||(BRAIN.action==='ambush'&&BRAIN.arrived)))peekAdjust(AI.spot,AI.t2)}
   if(AC&&MON.visible&&CR&&G.state!=='ending'&&G.lvl===0){const h=CR.B.head_05.getWorldPosition(_e);setPos(monPan,h.x,h.y,h.z)}
-  updateListener();
+  updateListener();viewerTick();
   G.glitch=Math.max(0,G.glitch-dt*.8);const dP=G.lvl===1?(SMR.ok?Math.hypot(SMR.pos.x-player.x,SMR.pos.z-player.z)*1.4:99):G.lvl===2?(L3.on?(G3.state==='scan'?99:Math.hypot(G3.pos.x-player.x,G3.pos.z-player.z)*.5):99):MON.visible?Math.hypot(MON.pos.x-player.x,MON.pos.z-player.z):99;
   VHS.uniforms.glitch.value=G.state==='intro'?INTRO.glitch:G.state==='ending'?END.glitch:Math.max(G.glitch,clamp(1-dP/7,0,1)*.6,G.boT>0?.4:0);VHS.uniforms.time.value=performance.now()/1000;
   kcRecord(dt);updatePinaHead();
@@ -2939,6 +2946,34 @@ function l3ClimbOut(w){const p0=camera.position.clone(),yaw0=player.yaw;const tg
     if(G3.state!=='scan'){G3.lookT.set(player.x,0,player.z);G3.look.lerp(G3.lookT,1-Math.exp(-dt*3));resetIntent();INTENT.stand=1;INTENT.noDrag=true;INTENT.limp=false;INTENT.jaw=1;INTENT.armsUp=.6;l3GiantPose(dt);l3Beam(dt)}},
     ()=>{finaleReset();G.lvl=0;levelGroup.clear();startEnding()})}
 
+
+/* ============ STAGE SELECT and CUTSCENE VIEWER (from the title screen) ============ */
+const VIEWER={on:false};
+function freshRun(){H.games++;saveH();finaleReset();endCleanup();KC.buf=[];applyPina();clearLevelItems();setFade(0);
+  Object.assign(G,{lvl:0,brk:0,light:true,flickOff:0,notes:5,trail:[],sights:[],hides:[],hideT:0,heat:new Float32Array(GW*GH),fq:[],batt:100,tapes:3,deaths:0,exitOpen:false,time:0,explored:new Uint8Array(GW*GH),crouch:false,mapOpen:false,paused:false});
+  exitDoor=null;exitLight.intensity=0;exitLight.color.setHex(0xff2a1a);AI.first=true;AI.chain=0;hideMonster(999);VIEWER.on=false}
+function returnToTitle(){VIEWER.on=false;CUT.on=false;finaleReset();endCleanup();clearLevelItems();KC.buf=[];setFade(0);G.lvl=0;$('hud').hidden=true;$('prompt').hidden=true;hideMonster(999);
+  if(AC){breathG.gain.setTargetAtTime(0,AC.currentTime,.1);tensG.gain.setTargetAtTime(0,AC.currentTime,.1)}RNG=mulberry((Math.random()*1e9)|0);generate();buildLevel();G.explored=new Uint8Array(GW*GH);G.state='title';showTitle()}
+function menuCard(title,sub,items){
+  show(`<div class="tape"><div class="label"><div class="top"><span>TAPE 07</span><span>${sub}</span></div><h2>${title}</h2>
+    <div class="menu">${items.map((it,i)=>`<button type="button" class="opt" data-i="${i}" ${it.ok()?'':'disabled'}>${it.name}<small>${it.ok()?it.sub:'still loading…'}</small></button>`).join('')}</div></div>
+    <div class="actions"><span class="fine">E OR TAP TO SKIP A SCENE</span><button type="button" data-go id="goBack">◀ BACK</button></div></div>`);
+  scr.querySelectorAll('.menu button').forEach(b=>b.onclick=()=>{initAudio();if(AC&&AC.state==='suspended')AC.resume();items[+b.dataset.i].go()});$('goBack').onclick=()=>showTitle()}
+const haveMon=()=>!!CR&&worldReady,haveSmile=()=>haveMon()&&SMR.ok;
+function stageMenu(){menuCard('STAGE SELECT','SKIP AHEAD',[
+  {name:'LEVEL 0 · THE CARPET',sub:'notes, the exit, the one that freezes in your light',ok:haveMon,go:()=>{newGame();finishIntro()}},
+  {name:'LEVEL 2 · SERVICE TUNNELS',sub:'the blind one that hunts by sound, three breakers',ok:haveSmile,go:()=>{freshRun();enterLevel2(false);G.state='card';$('hud').hidden=true;l2Card()}},
+  {name:'LEVEL 3 · THE WINDOWS',sub:'the courtyard, the giant, the curtains',ok:haveMon,go:()=>{freshRun();enterL3();G.state='card';$('hud').hidden=true;l3Card()}}])}
+function cutMenu(){menuCard('CUTSCENES','THE TAPE, REWOUND',[
+  {name:'THE BASEMENT',sub:'how you got in',ok:haveMon,go:()=>{newGame();VIEWER.on=true}},
+  {name:'THE STAIRWELL',sub:'level 0 to level 2',ok:haveSmile,go:()=>{freshRun();VIEWER.on=true;enterLevel2(true)}},
+  {name:'THE FREIGHT LIFT',sub:'level 2 to level 3',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;startL3()}},
+  {name:'OUT THE WINDOW',sub:'leaving the courtyard',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;enterL3();l3OpenExit(L3.win[0]);const w=L3.exitWin;
+    player.x=w.pos.x+w.n.x*1.6;player.z=w.pos.z+w.n.z*1.6;player.yaw=Math.atan2(w.n.x,w.n.z);player.pitch=0;G.state='play';placeCamera(0);camera.updateMatrixWorld();G.caps=[];$('captions').innerHTML='';l3ClimbOut(w)}},
+  {name:'THE ENDING',sub:'the parking lot, and the tape three weeks later',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;startEnding()}}])}
+// when a scene being watched hands over to gameplay (or ends), go back to the title instead
+function viewerTick(){if(!VIEWER.on)return;if(['play','card','end','dead'].includes(G.state)){VIEWER.on=false;returnToTitle()}}
+
 /* ============ SETTINGS (start menu toggles, off by default, remembered in this browser) ============ */
 const SETTINGS=(()=>{const d={killcam:false,pina:false};try{return Object.assign(d,JSON.parse(localStorage.getItem('noclip-settings')||'{}'))}catch(e){return d}})();
 function saveSettings(){try{localStorage.setItem('noclip-settings',JSON.stringify(SETTINGS))}catch(e){}}
@@ -3092,13 +3127,14 @@ const armsDone=g=>{Promise.resolve(g?vmSetup(g):null).catch(e=>console.warn(e)).
 const LOAD={q:[],busy:false,n:0,done:0,label:'',failed:[]};
 function b64ToBuffer(t){t=t.replace(/\s+/g,'');const pad=t.endsWith('==')?2:t.endsWith('=')?1:0,out=new Uint8Array(t.length/4*3-pad);const CH=1<<20;let o=0;// decode in 1 MB slices: no giant temporary strings
   for(let i=0;i<t.length;i+=CH){const bin=atob(t.slice(i,i+CH));for(let k=0;k<bin.length;k++)out[o++]=bin.charCodeAt(k)}return out.buffer}
-async function fetchBuf(url){let err;for(let k=0;k<4;k++){try{const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return url.endsWith('.txt')?b64ToBuffer(await r.text()):await r.arrayBuffer()}catch(e){err=e;console.warn('retrying',url,e);await new Promise(res=>setTimeout(res,700*(k+1)))}}throw err}
+async function fetchBuf(url){let err;for(let k=0;k<4;k++){try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),30000);const r=await fetch(url,{signal:ac.signal});clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);return url.endsWith('.txt')?b64ToBuffer(await r.text()):await r.arrayBuffer()}catch(e){err=e;console.warn('retrying',url,e);await new Promise(res=>setTimeout(res,700*(k+1)))}}throw err}
 function loadModel(url,label,done){LOAD.q.push({url,label,done});LOAD.n++;pumpLoad()}
 async function pumpLoad(){if(LOAD.busy)return;const job=LOAD.q.shift();if(!job){LOAD.label='';showLoad();return}LOAD.busy=true;LOAD.label=job.label;showLoad();let g=null;
-  try{const buf=await fetchBuf(job.url);g=await new GLTFLoader().parseAsync(buf,'./')}catch(e){console.error('could not load',job.url,e);LOAD.failed.push(job.label)}
-  try{job.done(g)}catch(e){console.error(e)}LOAD.done++;LOAD.busy=false;await new Promise(r=>setTimeout(r,30));pumpLoad()}
+  const t0=performance.now();let t1=t0,t2=t0;try{const buf=await fetchBuf(job.url);t1=performance.now();g=await new GLTFLoader().parseAsync(buf,'./');t2=performance.now()}catch(e){console.error('could not load',job.url,e);LOAD.failed.push(job.label)}
+  try{job.done(g)}catch(e){console.error(e)}console.info(`[load] ${job.label}: download+decode ${(t1-t0|0)}ms, parse ${(t2-t1|0)}ms, setup ${(performance.now()-t2|0)}ms`);LOAD.done++;LOAD.busy=false;await new Promise(r=>setTimeout(r,30));pumpLoad()}
 function showLoad(){const b=$('goTitle');if(!b||modelReady)return;if(LOAD.label){b.disabled=true;b.textContent=`LOADING ${Math.min(LOAD.done+1,LOAD.n)}/${LOAD.n} · ${LOAD.label}`}}
 loadModel(MODEL_URL,'MONSTER',onModel);
+setTimeout(()=>{if(!worldReady){console.warn('rooms are slow to load: letting you play without them for now');worldReady=true;checkReady()}},20000);
 loadModel(WORLD_URL,'ROOMS',worldDone);
 loadModel(ARMS_URL,'HANDS',armsDone);
 loadModel(CC_URL,'CAMCORDER',ccDone);
@@ -3137,7 +3173,7 @@ if(DEBUG)window.__dbg=function(mode,secs){
 };
 function initAudioStub(){}
 if(DEBUG){window.__lvl2=()=>{enterLevel2();return{start:START,brk:L2.breakers.length,lamps:L2.lamps.length,smile:SMR.ok,sm:SMR.pos.toArray()}};
-  window.__l3=()=>{enterL3();startPlay();return{win:L3.win.length,col:L3.col.length,cov:L3.cov.length,cr:!!CR}};window.__startL3=startL3;window.__vmReach=()=>VM.reach?{kind:VM.reach.kind,t:+VM.reach.t.toFixed(2)}:null;window.__startL2=startLevel2;window.__hands=()=>['HandL_011','HandR_024','ArmL_09','ArmR_022'].map(n=>CR.B[n].getWorldPosition(new V3()).toArray().map(v=>v.toFixed(1)).join(',')).join(' | ');window.__L3=L3;window.__G3=G3;window.__cut=CUT;window.__endCut=endCut;
+  window.__l3=()=>{enterL3();startPlay();return{win:L3.win.length,col:L3.col.length,cov:L3.cov.length,cr:!!CR}};window.__startL3=startL3;window.__cutMenu=cutMenu;window.__stageMenu=stageMenu;window.__viewer=VIEWER;window.__vmReach=()=>VM.reach?{kind:VM.reach.kind,t:+VM.reach.t.toFixed(2)}:null;window.__startL2=startLevel2;window.__hands=()=>['HandL_011','HandR_024','ArmL_09','ArmR_022'].map(n=>CR.B[n].getWorldPosition(new V3()).toArray().map(v=>v.toFixed(1)).join(',')).join(' | ');window.__L3=L3;window.__G3=G3;window.__cut=CUT;window.__endCut=endCut;
   window.__smFront=(d,state)=>{smPlace(player.x-Math.sin(player.yaw)*d,player.z-Math.cos(player.yaw)*d,player.yaw);SMAI.state=state||'listen';SMAI.listen=99;SMR.root.visible=true;return true};
   window.__state=()=>({lvl:G.lvl,state:G.state,brk:G.brk,exit:!!exitDoor,sm:SMR.ok?{x:+SMR.pos.x.toFixed(1),z:+SMR.pos.z.toFixed(1),st:SMAI.state,sp:+SMR.speed.toFixed(2)}:null,p:{x:+player.x.toFixed(1),z:+player.z.toFixed(1),y:+player.y.toFixed(2)},l3:L3.on?{st:G3.state,sus:+G3.sus.toFixed(2),gx:+G3.pos.x.toFixed(1),gz:+G3.pos.z.toFixed(1),pulls:L3.pulls,sides:L3.sides.size,exit:!!L3.exitWin,awake:L3.awake}:null,tapes:G.tapes});
   window.__vhs=v=>{VHS.enabled=v};window.__card2=startLevel2;window.__keys=keys;window.__smKill=t=>{beginSmileKill();for(let i=0;i<t*30;i++)window.__frame(1/30);return G.state};window.__clearWalls=()=>{for(let y=1;y<GH;y++)for(let x=0;x<GW;x++)hE[hI(x,y)]=0;for(let y=0;y<GH;y++)for(let x=1;x<GW;x++)vE[vI(x,y)]=0;hD.fill(0);vD.fill(0);pillars=[];buildLevel();player.x=player.z=16*CS;return true};window.__smYaw=y=>{SMR.yaw=y;smSnap();return true};
