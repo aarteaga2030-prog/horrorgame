@@ -4,6 +4,8 @@ A first-person found-footage horror game in a Backrooms-style maze, built with T
 
 You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper and dead lights. It's pitch black, and your flashlight is the only light. The camcorder is still recording. Someone was here before you and left five notes on the walls. Find them, then find the exit. A six-foot thing with a permanent grin walks the halls.
 
+The exit doesn't go out. It goes down, to level 2, where something blind hunts you by sound. At the bottom of level 2, the first one is waiting, and it has grown.
+
 ## The monster
 
 It uses `smily_horror_monster.glb`, scaled to stand 2.35 m (about 7'8") tall. It hunches to squeeze through doorways. Every movement is procedural: the game drives the model's bones with inverse kinematics instead of playing canned animations.
@@ -116,6 +118,34 @@ You see your own gloved arms (`fps_arms.glb`), posed live every frame with the s
 - **The kill:** both hands come up to shield your face, get shoved aside, and the camcorder falls.
 - **Intro and ending:** you carry the box down the stairs, reach for the wall that isn't there, flail as you fall, and push the exit door open at the end.
 
+## Level 2: the service tunnels
+
+The exit door from level 0 opens onto a staircase going down. Level 2 is a new maze of concrete maintenance tunnels: pipes along the walls, puddles, floor grates, a green-and-yellow painted band, and red emergency lamps (most of them dead). The tunnels are longer and narrower than level 0, with fewer loops.
+
+The thing down here is The Smile: a tall, pale, stooped figure with long arms and a mouth that never closes. It is blind. It hunts by sound:
+
+- Running can be heard about 20 m away (less through walls). It shrieks and rushes the spot.
+- Walking can be heard a few metres away. It comes to investigate.
+- Crouching is almost silent. Standing still is silent, but it can still walk into you.
+- It clicks its tongue to find its way, so you can hear where it is. The clicking speeds up when it stops to listen.
+
+Your objective is three breakers on the walls. You can hear them buzz. Throwing one is a loud CLUNK that it hears from anywhere nearby, and it comes running. After the third breaker, the freight lift opens somewhere far away. The tapes are fresh when you start level 2, a death costs a tape and you keep your breakers, and if all three tapes run out the tunnels change and you start level 2 again.
+
+When it catches you, it folds down over you face-first, both hands on your head.
+
+It has its own rig: two-bone IK for its legs and long arms, a stepping gait, a torso that stoops more the faster it goes, and a head that twitches and tilts while it listens.
+
+## The finale: the tunnel run
+
+The freight lift drops you into a drainage tunnel big enough for a train. Behind you, the smiling monster from level 0 crawls out of the dark at eight times its size. Run for the EXIT sign about 240 m away:
+
+- There is no stamina limit down here.
+- Steer round the piles of rubble.
+- Pipes cross the tunnel at head height. Press C while running to slide under them. Hitting one knocks you down for a moment.
+- When it pounds the floor, slabs come down from the ceiling. Grit trickles first: get to the other side of the tunnel.
+
+It never falls far behind and it catches up fast if you stop or look back for long. If it catches you, the run restarts (no tape lost). Reach the exit and the ending film plays. With Pina mode on, the giant gets Mr. Pina's face too, and the kill cam works in both new areas.
+
 ## The map
 
 Press M to hold up Wanderer 7's pencil map. The game keeps running while you read it. It shows the walls you've seen, your trail, every spot where you saw the monster (with how long ago), and a circle where the next note probably is.
@@ -134,7 +164,8 @@ Open the EXIT door and a short film plays. You stumble out into a rainy parking 
 | --- | --- |
 | Move / sprint / crouch | W A S D / Shift / C |
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
-| Read a note / open the door | E |
+| Read a note / open the door / throw a breaker | E |
+| Slide (finale, while running) | C |
 | Flashlight on/off | F |
 | Map (game keeps running) | M |
 
@@ -154,12 +185,14 @@ Then open http://localhost:8000.
 - `smily_horror_monster.glb`: the monster's model and skeleton
 - `fps_arms.glb`: your arms
 - `camcorder.glb`: the camcorder
+- `smile.glb`: level 2's hunter, a simplified copy (1.5 MB) of `the_smile__rigged 2.glb`
 - `world.glb`: what the game actually loads for the rooms and furniture (3.8 MB). It's built from the five models below: textures shrunk, unused parts of the room scan removed, and the desk chair simplified.
 - `backrooms_vr.glb`, `70s_desk_chair.glb`, `backrooms_movie_ladderback_restaurant_chair.glb`, `sofa_-_classic_furniture_set..glb`, `trim_sheet__example_dresser.glb`: the original models
 
 ## Credits
 
 - Monster: "Smily horror monster" (CC BY 4.0), from Sketchfab.
+- Level 2 hunter: "The smile ( Rigged)" by Vertex Mercher (CC BY 4.0), from Sketchfab. `smile.glb` is a simplified copy.
 - Arms: "fps arms" (CC BY 4.0), from Sketchfab.
 - Camcorder: "Camcorder" by omegadarling (CC BY 4.0), from Sketchfab.
 - Rooms: "Backrooms VR" by carlcapu9 (CC BY 4.0), from Sketchfab.
