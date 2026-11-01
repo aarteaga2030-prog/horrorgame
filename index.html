@@ -1623,7 +1623,7 @@ function brainReset(grace){
   const[pcx,pcy]=cellOf(player.x,player.z);const f=cellBFS(pcx,pcy);let maxd=0;for(let i=0;i<GW*GH;i++)if(f[i]>maxd)maxd=f[i];
   const far=[];for(let i=0;i<GW*GH;i++)if(f[i]>=Math.max(9,maxd*.6))far.push(i);const c=far.length?pick(far):0;
   resetIntent();placeMonster((c%GW+.5)*CS,((c/GW|0)+.5)*CS,rnd()*6.28,1);showMonster();setAI('brain');
-  Object.assign(BRAIN,{herdCool:10,hist:[],engaged:0,nearT:0,decoyCool:20,silentT:0,forceFlank:0,action:null,goal:null,think:0,actT:0,menace:0,backoffT:grace||0,lurkCool:12,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,lostSaid:false,seenAtLurk:0});
+  Object.assign(BRAIN,{herdCool:10,hist:[],engaged:0,nearT:0,decoyCool:20,silentT:0,forceFlank:0,action:null,goal:null,think:0,actT:0,menace:0,backoffT:grace||0,huntT:0,huntLim:30+rnd()*20,brk:false,lurkCool:12,arrived:false,waitT:0,peek:null,peekP:0,sightRec:false,lostSaid:false,seenAtLurk:0});
   BRAIN.visited=new Float32Array(GW*GH).fill(-99);
   BR.x=player.x+(rnd()-.5)*CS*6;BR.z=player.z+(rnd()-.5)*CS*6;BR.vx=BR.vz=0;BR.conf=.3;BR.t=G.time;AI.style='walk';AI.styleT=3;AI.dash=false;
 }
@@ -1715,7 +1715,7 @@ function playDecoy(dP){if(!AC||!decoyPan){BRAIN.forceFlank=1;return}
 function think(dP,lit,inV){
   const a=aggression(),hb=habits(),conf=BR.conf,pv=Math.hypot(player.vx||0,player.vz||0),o={};
   if(BRAIN.forceFlank&&!(BRAIN.backoffT>0)){BRAIN.forceFlank=0;o.flank=2}
-  if(BRAIN.backoffT>0&&!G.exitOpen)o.retreat=3;
+  if(BRAIN.backoffT>0&&(!G.exitOpen||BRAIN.brk))o.retreat=3;
   else{
     const n=()=>rnd()*.18;
     o.search=.55-conf*.5+n();
@@ -1761,6 +1761,11 @@ function updateAI(dt){
   BRAIN.menace=clamp(BRAIN.menace+dt*(dP<10?(inV?TUNE.menace:TUNE.menace*.4)*(1.5-dP/10):-.05),0,1);BRAIN.decoyCool-=dt;BRAIN.herdCool-=dt;BRAIN.silentT-=dt;BRAIN.dangerT=(BRAIN.dangerT||0)-dt;if(BRAIN.dangerT<=0){BRAIN.dangerT=.4;updateDanger()}
   BRAIN.backoffT-=dt;BRAIN.lurkCool-=dt;
   if(BRAIN.menace>.97&&BRAIN.backoffT<=0&&!G.exitOpen){BRAIN.backoffT=TUNE.backoff+rnd()*4;BRAIN.menace=.5;BRAIN.think=0}
+  // breathers: after 30-50 s of being hunted it pulls back and leaves you alone for a while
+  if(BRAIN.backoffT<=0){BRAIN.brk=false;BRAIN.huntT=(BRAIN.huntT||0)+dt}
+  if(BRAIN.huntLim==null)BRAIN.huntLim=30+rnd()*20;
+  if((BRAIN.huntT||0)>BRAIN.huntLim){BRAIN.huntT=0;BRAIN.huntLim=30+rnd()*20;BRAIN.backoffT=G.exitOpen?10+rnd()*5:16+rnd()*10;BRAIN.brk=true;BRAIN.menace=.3;BRAIN.think=0;BRAIN.forceFlank=0;
+    if(dP<20)caption(pick(['[It pulls back into the dark. For now.]','[The footsteps go away. Breathe.]','[It has stopped following. For a little while.]']))}
   BRAIN.actT+=dt;BRAIN.think-=dt;if(BRAIN.think<=0){BRAIN.think=lit?.25:.4;think(dP,lit,inV)}
   // stared at too long: burst of flickers and a dash to cover
   const flick=G.light&&G.flickOff>0;const stareLimit=clamp(habits().stare*TUNE.stareK,.7,2.2);
@@ -2200,7 +2205,7 @@ function drawMap(){
   // sightings
   G.sights.forEach(sg=>{const age=G.time-sg.t,al=clamp(1-age/150,.25,1);const X=sg.x/CS*S,Y=sg.z/CS*S,k=S*.42;g.strokeStyle=`rgba(168,40,29,${al})`;g.lineWidth=2.6;g.beginPath();g.moveTo(X-k,Y-k);g.lineTo(X+k,Y+k);g.moveTo(X+k,Y-k);g.lineTo(X-k,Y+k);g.stroke();
     if(age<600){g.fillStyle=`rgba(168,40,29,${al})`;g.font=`${S*.62}px VT323,monospace`;g.fillText(age<60?`${age|0}s`:`${age/60|0}m`,X,Y+k+S*.4)}});
-  if(G.lvl===1)for(const b of L2.breakers){if(!G.explored[b.cy*GW+b.cx]&&!b.on)continue;const X=b.pos.x/CS*S,Y=b.pos.z/CS*S;g.fillStyle=b.on?'#2d7a3a':'#b8372d';g.fillRect(X-S*.3,Y-S*.4,S*.6,S*.8);g.font=`${S*.9}px Caveat,cursive`;g.fillText(b.on?'on':'breaker',X,Y-S*.9)}
+  if(G.lvl===1)for(const b of L2.breakers){const X=b.pos.x/CS*S,Y=b.pos.z/CS*S;g.fillStyle=b.on?'#2d7a3a':'#b8372d';g.fillRect(X-S*.3,Y-S*.4,S*.6,S*.8);g.font=`${S*.9}px Caveat,cursive`;g.fillText(b.on?'on':'breaker',X,Y-S*.9)}
   if(exitDoor){const X=exitDoor.x/CS*S,Y=exitDoor.z/CS*S;g.fillStyle='#b8372d';g.fillRect(X-S*.5,Y-S*.5,S,S);g.font=`${S*1.1}px Caveat,cursive`;g.fillText(G.lvl===1?'LIFT!':'EXIT!',X,Y-S*1.1)}
   // you + view cone
   const px=player.x/CS*S,pz=player.z/CS*S,fa=Math.atan2(-Math.cos(player.yaw),-Math.sin(player.yaw));
@@ -2422,8 +2427,8 @@ const SMR={ok:false,root:null,body:null,B:{},all:[],pos:new V3(),yaw:0,vel:new V
 function onSmile(gltf){
   const model=gltf.scene,B={};
   model.traverse(o=>{if(o.isBone)B[o.name]=o;if(o.isMesh){const om=o.material,eye=/003/.test(om.name||'');
-    const m=new THREE.MeshPhysicalMaterial({map:om.map||null,color:eye?0xffffff:0x8f8a82,roughness:eye?.16:.5,metalness:0,clearcoat:eye?1:.35,clearcoatRoughness:eye?.04:.42,sheen:eye?0:.45,sheenRoughness:.55,sheenColor:new THREE.Color(0xd8cfc4),side:om.side});
-    if(m.map)m.map.colorSpace=THREE.SRGBColorSpace;o.material=m;o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false}});
+    const m=new THREE.MeshPhysicalMaterial({map:om.map||null,color:eye?0xffffff:0xd8d2c8,roughness:eye?.16:.42,metalness:0,clearcoat:eye?1:.75,clearcoatRoughness:eye?.04:.32,sheen:eye?0:1,sheenRoughness:.42,sheenColor:new THREE.Color(0xa8a29a),side:om.side});
+    if(m.map)m.map.colorSpace=THREE.SRGBColorSpace;if(!eye&&o.isSkinnedMesh)smSkin(m,o);o.material=m;o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false}});
   const need=[...SM_CH.legs.flat(),...SM_CH.arms.flat(),SM_CH.head];if(!need.every(n=>B[n])){console.warn('Smile rig bones missing');return}
   const root=new THREE.Group(),body=new THREE.Group(),turn=new THREE.Group(),holder=new THREE.Group();root.add(body);body.add(turn);turn.add(holder);holder.add(model);scene.add(root);
   root.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(model,true);const H=bb.max.y-bb.min.y,s=2.62/H;
@@ -2436,6 +2441,19 @@ function onSmile(gltf){
   SMR.arms=SM_CH.arms.map(n=>{const a=P(n[0]),k=P(n[1]),f=P(n[2]);return{n,la:a.distanceTo(k),lb:k.distanceTo(f),x:a.x}});
   SMR.feet=[0,1].map(()=>({planted:new V3(),from:new V3(),to:new V3(),cur:new V3(),t:0,dur:.5,stepping:false}));
   SMR.head=B[SM_CH.head];root.visible=false;window.__smileInfo={H,s,pelH:SMR.pelH,legs:SMR.legs.map(l=>[l.la,l.lb,l.x,l.z]),arms:SMR.arms.map(a=>[a.la,a.lb,a.x]),ankleH:SMR.ankleH}}
+// the body is near-black wet skin with a crawling grain; only the face (weighted to the head bone) stays pale
+const SMU={uT:{value:0}};
+function smSkin(m,mesh){const hi=Math.max(0,mesh.skeleton.bones.findIndex(b=>b.name===SM_CH.head));
+  m.onBeforeCompile=sh=>{sh.uniforms.uT=SMU.uT;sh.uniforms.uHead={value:hi};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nuniform float uHead;varying float vHead;varying vec2 vGr;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvHead=dot(skinWeight,vec4(equal(skinIndex,vec4(uHead))));vGr=uv;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform float uT;varying float vHead;varying vec2 vGr;float smh(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}')
+      .replace('#include <map_fragment>',`#include <map_fragment>
+        float hm=smoothstep(.55,.92,vHead);
+        float gr=smh(floor(vGr*720.)+floor(uT*12.)*.37);float sp=smh(floor(vGr*260.));
+        vec3 body=diffuseColor.rgb*vec3(.075,.07,.066)*(.55+.9*gr)+vec3(.05)*step(.985,sp);
+        diffuseColor.rgb=mix(body,diffuseColor.rgb*1.08,hm);`)};
+  m.customProgramCacheKey=()=>'smile_skin';m.needsUpdate=true}
 function smIdeal(i,out){const L=SMR.legs[i];out.set(L.x*.85,0,L.z).applyAxisAngle(UP,SMR.yaw).add(SMR.pos);const lead=smStepDur()*.5;out.x+=SMR.vel.x*lead;out.z+=SMR.vel.z*lead;out.y=SMR.ankleH;return out}
 function smStepDur(){return clamp(.66-SMR.speed*.085,.24,.66)}
 function smSnap(){for(let i=0;i<2;i++){const F=SMR.feet[i];smIdeal(i,F.planted);F.cur.copy(F.planted);F.stepping=false}SMR.hands.forEach((h,i)=>h.snap(new V3(SMR.pos.x,1,SMR.pos.z)))}
@@ -2449,9 +2467,9 @@ function smGait(dt){
 function smStep(){if(!AC||G.lvl!==1)return;const v=clamp(.25+SMR.speed*.12,.2,.9);hiss(monBus,{ft:'lowpass',f:230,v:v*.7,d:.16});hiss(monBus,{f:1500,q:1.2,v:v*.12,d:.06});if(SMR.speed>3)tone(monBus,{f:60,f2:40,v:v*.25,d:.12})}
 // pose: legs and arms are solved with two-bone IK in world space, the torso rides on the pelvis, the head is turned on top
 function smPose(dt,I){
-  if(!SMR.ok)return;I=I||{};
+  if(!SMR.ok)return;I=I||{};SMU.uT.value=G.time;
   SMR.lean.step(I.lean??.3,30,dt);SMR.dip.step(I.dip??0,30,dt);SMR.reach.step(I.reach??0,40,dt);
-  SMR.twT-=dt;if(SMR.twT<=0){SMR.twT=I.listen?.25+rnd()*.6:.8+rnd()*2.5;SMR.tw=[(rnd()-.5)*.22,(rnd()-.5)*1.1,(rnd()-.5)*(I.listen?1.5:.7)]}
+  SMR.twT-=dt;if(SMR.twT<=0){SMR.twT=I.listen?.25+rnd()*.6:.8+rnd()*2.5;SMR.tw=[(rnd()-.5)*.2,(rnd()-.5)*.8,(rnd()-.5)*(I.listen?.9:.5)]}
   SMR.hp.step((I.hp??0)+SMR.tw[0],I.listen?300:90,dt);SMR.hy.step((I.hy??0)+SMR.tw[1],I.listen?300:80,dt);SMR.hr.step((I.hr??0)+SMR.tw[2],I.listen?260:70,dt);
   smGait(dt);SMR.breath+=dt*(1.5+SMR.speed*.5);
   if(I.choppy){SMR.chopAcc+=dt;if(SMR.chopAcc<.08)return;SMR.chopAcc=0}
@@ -2503,8 +2521,8 @@ function updateSmileAI(dt){
   A2.hearT-=dt;if(A2.hearT<=0){A2.hearT=.2;if(G.noise>0&&rnd()<.9)smHear(player.x,player.z,G.noise*1.15,G.noise>10?'run':'step')}
   const dP=Math.hypot(player.x-SMR.pos.x,player.z-SMR.pos.z);let I={};
   if(A2.state==='wander'){if(!A2.goal||A2.t>22)A2.goal=smWanderGoal(),A2.t=0;const d=smMove(A2.goal.x,A2.goal.z,1.6,dt);I={lean:.32,hp:-.12};if(d<.5)smSetState('listen')}
-  else if(A2.state==='investigate'){const d=smMove(A2.heard.x,A2.heard.z,2.05,dt);I={lean:.42,hp:-.1,reach:.25};if(d<.45)smSetState('listen');if(A2.t>25)smSetState('wander')}
-  else if(A2.state==='rush'){const d=smMove(A2.heard.x,A2.heard.z,5.15,dt);I={lean:.62,hp:-.35,reach:.9,choppy:false};
+  else if(A2.state==='investigate'){const d=smMove(A2.heard.x,A2.heard.z,2.05,dt);I={lean:.42,hp:-.1,reach:.25,choppy:SMAI.t%3<1.4};if(d<.45)smSetState('listen');if(A2.t>25)smSetState('wander')}
+  else if(A2.state==='rush'){const d=smMove(A2.heard.x,A2.heard.z,5.15,dt);I={lean:.62,hp:-.35,reach:.9,choppy:true,hr:Math.sin(G.time*3.1)*.35};
     if(d<.5&&G.time-A2.heardT>.9)smSetState('listen');if(G.time-A2.heardT>9)smSetState('listen')}
   else{smMove(SMR.pos.x,SMR.pos.z,0,dt);A2.listen-=dt;I={lean:.18,hp:-.12,listen:true,choppy:true,dip:.08};if(A2.listen<=0)smSetState('wander')}
   // stuck: nudge to a new goal

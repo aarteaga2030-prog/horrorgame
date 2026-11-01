@@ -77,7 +77,11 @@ It cannot move while your flashlight is on it. It freezes mid-step, mid-pose. Bu
 
 ## How it thinks
 
-It's always somewhere in the maze. Nothing teleports. It builds a belief about where you are:
+It's always somewhere in the maze. Nothing teleports. It builds a belief about where you are.
+
+It also takes breathers: after every 30 to 50 seconds of hunting you, it pulls back somewhere out of sight for 16 to 26 seconds (10 to 15 once the exit is open) before it starts again.
+
+What it uses to work out where you are:
 
 - **Sight:** your flashlight gives you away to anything with line of sight. In the dark it only sees you up close.
 - **Sound:** running is loud, walking is quieter, crouching is nearly silent.
@@ -122,14 +126,14 @@ You see your own gloved arms (`fps_arms.glb`), posed live every frame with the s
 
 The exit door from level 0 opens onto a staircase going down. Level 2 is a new maze of concrete maintenance tunnels: pipes along the walls, puddles, floor grates, a green-and-yellow painted band, and red emergency lamps (most of them dead). The tunnels are longer and narrower than level 0, with fewer loops.
 
-The thing down here is The Smile: a tall, pale, stooped figure with long arms and a mouth that never closes. It is blind. It hunts by sound:
+The thing down here is The Smile: a tall, stooped figure with long arms and a mouth that never closes. Its body is wet, near-black skin with a crawling grain, so in the beam you mostly see the pale ridges of its ribs and shoulders and its white skull face. When it rushes or investigates it moves in jerky stop-motion. It is blind. It hunts by sound:
 
 - Running can be heard about 20 m away (less through walls). It shrieks and rushes the spot.
 - Walking can be heard a few metres away. It comes to investigate.
 - Crouching is almost silent. Standing still is silent, but it can still walk into you.
 - It clicks its tongue to find its way, so you can hear where it is. The clicking speeds up when it stops to listen.
 
-Your objective is three breakers on the walls. You can hear them buzz. Throwing one is a loud CLUNK that it hears from anywhere nearby, and it comes running. After the third breaker, the freight lift opens somewhere far away. The tapes are fresh when you start level 2, a death costs a tape and you keep your breakers, and if all three tapes run out the tunnels change and you start level 2 again.
+Your objective is three breakers on the walls. You can hear them buzz, and all three are marked on the map (M) from the start. Throwing one is a loud CLUNK that it hears from anywhere nearby, and it comes running. After the third breaker, the freight lift opens somewhere far away. The tapes are fresh when you start level 2, a death costs a tape and you keep your breakers, and if all three tapes run out the tunnels change and you start level 2 again.
 
 When it catches you, it folds down over you face-first, both hands on your head.
 
