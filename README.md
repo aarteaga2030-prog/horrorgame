@@ -4,7 +4,7 @@ A first-person found-footage horror game in a Backrooms-style maze, built with T
 
 You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper and dead lights. It's pitch black, and your flashlight is the only light. The camcorder is still recording. Someone was here before you and left five notes on the walls. Find them, then find the exit. A six-foot thing with a permanent grin walks the halls.
 
-The exit doesn't go out. It goes down, to level 2, where something blind hunts you by sound. At the bottom of level 2, the first one is waiting, and it has grown.
+The exit doesn't go out. It goes down, to level 2, where something blind hunts you by sound. Below that is level 3, a courtyard of windows, and the first one is standing in the middle of it, taller than the building.
 
 ## The monster
 
@@ -139,16 +139,26 @@ When it catches you, it folds down over you face-first, both hands on your head.
 
 It has its own rig: two-bone IK for its legs and long arms, a stepping gait, a torso that stoops more the faster it goes, and a head that twitches and tilts while it listens.
 
-## The finale: the tunnel run
+## Level 3: The Windows (Level 188)
 
-The freight lift drops you into a drainage tunnel big enough for a train. Behind you, the smiling monster from level 0 crawls out of the dark at eight times its size. Run for the EXIT sign about 240 m away:
+The freight lift drops for a long time and opens onto a courtyard as big as a city block. It's walled in by a hotel five floors high, with hundreds of windows, most of them curtained. This is the Backrooms' Level 188.
 
-- There is no stamina limit down here.
-- Steer round the piles of rubble.
-- Pipes cross the tunnel at head height. Press C while running to slide under them. Hitting one knocks you down for a moment.
-- When it pounds the floor, slabs come down from the ceiling. Grit trickles first: get to the other side of the tunnel.
+The smiling monster from level 0 followed you down. Here it is nine times its size, taller than the building, and it stands in the dry fountain in the very middle of the courtyard. It turns slowly, sweeping a searchlight out of its eyes across the courtyard. The light casts real shadows, so you can see where you're hidden.
 
-It never falls far behind and it catches up fast if you stop or look back for long. If it catches you, the run restarts (no tape lost). Reach the exit and the ending film plays. With Pina mode on, the giant gets Mr. Pina's face too, and the kill cam works in both new areas.
+- **Stay out of the light.** It can't see you deep under the arcade roof that runs round the ground floor, behind the tall hedges, or under the four gazebos. Running and having your flashlight on make it notice you faster, and crouching makes it slower. Walking right past its feet gets noticed too.
+- **When the light settles on you,** the beam turns red, it roars, and it hunts you. It walks after you, rears up with both arms over its head, then drops onto all fours and slams both hands down. A red ring marks where it's going to land, and it aims where you're heading, so keep moving. It can't reach you under a roof. It just smashes the roof.
+- **The way out:** pull back the curtains on the ground-floor windows (E). Each one opens onto somewhere else: a yellow level 0 room, the tunnels, an empty hotel room, a dark room going back further than the building could, or someone in a window beckoning you in. It hears every curtain. Once you've looked on all four sides of the courtyard, a window on the far side blows open onto rain and a street lamp, and the giant wakes up properly: faster, wider light, and it doesn't go back to the middle. Climb through.
+- Parts of the arcade roof have collapsed. The rubble pushes you out into the open.
+- People stand in some of the upper windows, but only at the edge of your vision (Level 188's "Peripherals"). Look straight at them and they're gone.
+- Dying here costs no tape. You wake up by the lift, the curtains you opened stay open, and it gives you a few seconds before it looks for you again.
+
+## Between the levels
+
+Each level hands over to the next with a short in-game scene (E or click to skip):
+
+- **Level 0 → level 2:** you step through the exit door onto a concrete stairwell. The door slams behind you and takes the yellow light with it. You go down two flights past a red lamp and someone's warning painted on the wall (DON'T RUN, it hears), then through a steel door into the dark.
+- **Level 2 → level 3:** the freight lift grinds down a long shaft with floor lights strobing past the gate, then thuds to a stop and dings. The gate and doors open onto the courtyard. You step out, look up at the giant as it sweeps the far side, and it turns its head and its light onto you.
+- **Level 3 → the ending:** you climb over the sill into the rain, and the ending film plays.
 
 ## The map
 
@@ -160,7 +170,7 @@ Your view whips around to face it. It rises, tilts its head and closes its hands
 
 ## The ending
 
-Open the EXIT door and a short film plays. You stumble out into a rainy parking lot under one orange street lamp as the door swings shut behind you. Then it's three weeks later: the tape rewinds and plays back the last seconds, filmed from the camcorder hanging at your side. A long pale hand slides out and stops the door from closing. Pause. One frame forward. It's in the doorway, smiling at the camera. Press E or tap to skip.
+Climb out through the open window in level 3 and a short film plays. You stumble out into a rainy parking lot under one orange street lamp as the door swings shut behind you. Then it's three weeks later: the tape rewinds and plays back the last seconds, filmed from the camcorder hanging at your side. A long pale hand slides out and stops the door from closing. Pause. One frame forward. It's in the doorway, smiling at the camera. Press E or tap to skip.
 
 ## Controls
 
@@ -168,8 +178,7 @@ Open the EXIT door and a short film plays. You stumble out into a rainy parking 
 | --- | --- |
 | Move / sprint / crouch | W A S D / Shift / C |
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
-| Read a note / open the door / throw a breaker | E |
-| Slide (finale, while running) | C |
+| Read a note / open the door / throw a breaker / pull curtains | E |
 | Flashlight on/off | F |
 | Map (game keeps running) | M |
 
