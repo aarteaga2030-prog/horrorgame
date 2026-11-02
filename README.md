@@ -4,7 +4,7 @@ A first-person found-footage horror game in a Backrooms-style maze, built with T
 
 You leaned on a wall and fell through it. Now it's damp carpet, yellow wallpaper and dead lights. It's pitch black, and your flashlight is the only light. The camcorder is still recording. Someone was here before you and left five notes on the walls. Find them, then find the exit. A six-foot thing with a permanent grin walks the halls.
 
-The exit doesn't go out. It goes down, to level 2, where something blind hunts you by sound. Below that is level 3, a courtyard of windows, and the first one is standing in the middle of it, taller than the building.
+The exit doesn't go out. It goes down, to level 2, where something blind hunts you by sound. Below that is level 3, a hotel built round a courtyard of windows, and the first one is out in that courtyard, taller than the building, looking in.
 
 ## The monster
 
@@ -52,7 +52,7 @@ The cut-out walls block you, the monster and its line of sight; the counters and
 ## Stage select and cutscenes (start menu)
 
 - **STAGE SELECT** jumps straight into level 0, level 2 or level 3 with fresh tapes.
-- **CUTSCENES** replays any scene on its own: the basement intro, the stairwell, the freight lift, climbing out of the window, and the ending film. Each one goes back to the title when it ends (E or tap skips).
+- **CUTSCENES** replays any scene on its own: the basement intro, the stairwell, the freight lift, the north stair door, and the ending film. Each one goes back to the title when it ends (E or tap skips).
 
 ## Settings (start menu)
 
@@ -146,24 +146,26 @@ It has its own rig: two-bone IK for its legs and long arms, a stepping gait, a t
 
 ## Level 3: The Windows (Level 188)
 
-The freight lift drops for a long time and opens onto a courtyard as big as a city block. It's walled in by a hotel five floors high, with hundreds of windows, most of them curtained. This is the Backrooms' Level 188.
+The freight lift drops for a long time and opens into the lift lobby of an old hotel, then goes dead behind you. The hotel is one long ring of building around a courtyard as big as a city block. On the ground floor a single corridor runs all the way round, with windows on the courtyard side and hotel rooms on the other. Across the yard, four more floors of windows look back at you. This is the Backrooms' Level 188.
 
-The smiling monster from level 0 followed you down. Here it is nine times its size, taller than the building, and it stands in the dry fountain in the very middle of the courtyard. It turns slowly, sweeping a searchlight out of its eyes across the courtyard. The light casts real shadows, so you can see where you're hidden.
+The smiling monster from level 0 followed you down. Here it is nine times its size, taller than the building, and it crouches in the middle of the courtyard. **Its eyes glow, and they throw a white beam.** It drags that beam along the windows of one wing at a time, back and forth, stopping now and then to lean in and peer through a window. The beam casts real shadows through the window frames, so you can watch the light crawl down the corridor toward you.
 
-- **Stay out of the light.** It can't see you deep under the arcade roof that runs round the ground floor, behind the tall hedges, or under the four gazebos. Running and having your flashlight on make it notice you faster, and crouching makes it slower. Walking right past its feet gets noticed too.
-- **When the light settles on you,** the beam turns red, it roars, and it hunts you. It walks after you, rears up with both arms over its head, then drops onto all fours and slams both hands down. A red ring marks where it's going to land, and it aims where you're heading, so keep moving. It can't reach you under a roof. It just smashes the roof.
-- **The way out:** pull back the curtains on the ground-floor windows (E). Each one opens onto somewhere else: a yellow level 0 room, the tunnels, an empty hotel room, a dark room going back further than the building could, or someone in a window beckoning you in. It hears every curtain. Once you've looked on all four sides of the courtyard, a window on the far side blows open onto rain and a street lamp, and the giant wakes up properly: faster, wider light, and it doesn't go back to the middle. Climb through.
-- Parts of the arcade roof have collapsed. The rubble pushes you out into the open.
-- People stand in some of the upper windows, but only at the edge of your vision (Level 188's "Peripherals"). Look straight at them and they're gone.
-- Dying here costs no tape. You wake up by the lift, the curtains you opened stay open, and it gives you a few seconds before it looks for you again.
+- **Stay out of the beam.** If it sits on you for about a second, the giant roars and comes for you. Crouching and switching your flashlight off buy you a little more time.
+- **Run.** Sprinting past the light is usually the way through, but it can hear you run, and it may swing the beam toward the sound.
+- **Duck into the rooms.** Every room has an open door off the corridor, and the beam can't reach far past the doorway.
+- **Close the curtains (E).** A closed curtain blocks the beam completely, so drawing the curtains ahead of the light makes a safe stretch of corridor.
+- **When it hunts you,** the beam stays on you through every window you pass. It rears up, then lunges at the building and punches both hands through the window nearest to where you're going. Glass sprays down the corridor and that window's curtains are gone for good. If you're right there, it has you.
+- **The way out:** find the **four fuses**, one in a room in each wing (they glint in the dark). Bring them to the fuse box in the lift lobby. That powers the lock on the **north stair door**, on the far side of the ring. It also turns every light in the building on, and the giant sees it: it gets faster, sweeps harder and listens harder. Run for the stairs.
+- People stand in some of the upper windows across the courtyard, but only at the edge of your vision (Level 188's "Peripherals"). Look straight at them and they're gone.
+- Dying here costs no tape. You wake up in the lift lobby, you keep your fuses, and its beam starts on some other wing.
 
 ## Between the levels
 
 Each level hands over to the next with a short in-game scene (E or click to skip):
 
 - **Level 0 → level 2:** you step through the exit door onto a concrete stairwell. The door slams behind you and takes the yellow light with it. You go down two flights past a red lamp and someone's warning painted on the wall (DON'T RUN, it hears), then through a steel door into the dark.
-- **Level 2 → level 3:** the freight lift grinds down a long shaft with floor lights strobing past the gate, then thuds to a stop and dings. The gate and doors open onto the courtyard. You step out, look up at the giant as it sweeps the far side, and it turns its head and its light onto you.
-- **Level 3 → the ending:** you climb over the sill into the rain, and the ending film plays.
+- **Level 2 → level 3:** the freight lift grinds down a long shaft with floor lights strobing past the gate, then thuds to a stop and dings. The gate and doors open onto the lift lobby, and the lift dies behind you. You walk out into the corridor and up to a window. The giant is out in the courtyard, sweeping its beam along the windows. It turns its glowing eyes, and its light, onto you.
+- **Level 3 → the ending:** you pull the north stair door open and step through. Behind you, the window across the corridor bursts and a giant hand reaches down the corridor after you. The door slams on its fingers, and the ending film plays.
 
 ## The map
 
@@ -175,7 +177,7 @@ Your view whips around to face it. It rises, tilts its head and closes its hands
 
 ## The ending
 
-Climb out through the open window in level 3 and a short film plays. You stumble out into a rainy parking lot under one orange street lamp as the door swings shut behind you. Then it's three weeks later: the tape rewinds and plays back the last seconds, filmed from the camcorder hanging at your side. A long pale hand slides out and stops the door from closing. Pause. One frame forward. It's in the doorway, smiling at the camera. Press E or tap to skip.
+Get through the north stair door in level 3 and a short film plays. You stumble out into a rainy parking lot under one orange street lamp as the door swings shut behind you. Then it's three weeks later: the tape rewinds and plays back the last seconds, filmed from the camcorder hanging at your side. A long pale hand slides out and stops the door from closing. Pause. One frame forward. It's in the doorway, smiling at the camera. Press E or tap to skip.
 
 ## Controls
 
@@ -183,7 +185,7 @@ Climb out through the open window in level 3 and a short film plays. You stumble
 | --- | --- |
 | Move / sprint / crouch | W A S D / Shift / C |
 | Look | Mouse (click to lock), drag on a touchscreen, or arrow keys |
-| Read a note / open the door / throw a breaker / pull curtains | E |
+| Read a note / open the door / throw a breaker / close curtains / take a fuse | E |
 | Flashlight on/off | F |
 | Map (game keeps running) | M |
 

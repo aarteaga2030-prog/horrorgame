@@ -1882,7 +1882,7 @@ function updateLights(dt){
   if(G.state==='play'&&!G.paused&&G.light&&G.batt<22&&G.flickOff<=0&&rnd()<dt*(22-G.batt)*.08){G.flickOff=.05+rnd()*.12}
   G.lightNow=G.state==='dying'?G.killLight:G.state==='dead'?false:(G.light&&G.flickOff<=0);
   flash.intensity=G.lightNow?(G.state==='dying'?20*clamp((K.dist||1)/1.1,.18,1):24*(.5+.5*clamp(G.batt/35,0,1))):0;spill.intensity=G.lightNow?.35:0;
-  if(G.lvl===1&&G.state!=='killcam')l2Lamps(dt);else if(G.lvl===2&&L3.on)l3Lights(dt);if(L3.moon)L3.moon.intensity=G.lvl===2&&L3.on&&G.state!=='killcam'?.7:0;if(G.state!=='killcam')scene.fog.density=G.lvl===2&&L3.on?.016:.055;
+  if(G.lvl===1&&G.state!=='killcam')l2Lamps(dt);else if(G.lvl===2&&L3.on)l3Lights(dt);if(L3.moon)L3.moon.intensity=G.lvl===2&&L3.on&&G.state!=='killcam'?1.5:0;if(G.state!=='killcam')scene.fog.density=G.lvl===2&&L3.on?.016:.055;
   hemi.intensity=(DEBUG&&window.__hemiOv)||(G.lvl===2&&L3.on?.3:.006);scene.fog.color.setRGB(0,0,0);scene.background.setRGB(0,0,0);
 }
 
@@ -2277,7 +2277,7 @@ function updatePlayer(dt){
   for(const n of notes){if(n.taken)continue;const d=Math.hypot(n.pos.x-player.x,n.pos.z-player.z);if(d<1.5){const v=new V3(n.pos.x-cp.x,n.pos.y-cp.y,n.pos.z-cp.z).normalize();if(v.dot(cf)>.55){prompt='<kbd>E</kbd>READ NOTE';if(ePress&&!VM.reach&&!n.reaching){n.reaching=true;ePress=false;const nn=n;if(G.mapOpen)toggleMap(false);vmReach(n.pos,ph=>{if(ph==='grab'){levelGroup.remove(nn.mesh);SND.paper()}else if(G.state==='play'&&!nn.taken)readNote(nn)},'note')}}}}
   if(G.lvl===1)for(const b of L2.breakers){if(b.on)continue;const d=Math.hypot(b.pos.x-player.x,b.pos.z-player.z);if(d<1.45){const v=new V3(b.pos.x-cp.x,b.pos.y-cp.y,b.pos.z-cp.z).normalize();if(v.dot(cf)>.5){prompt='<kbd>E</kbd>THROW THE BREAKER';if(ePress&&!VM.reach&&!b.reaching){b.reaching=true;ePress=false;const bb=b;vmReach(b.pos,ph=>{if(ph==='grab')throwBreaker(bb)},'note')}}}}
   if(exitDoor&&Math.hypot(exitDoor.x-player.x,exitDoor.z-player.z)<(G.lvl===1?1.9:1.6)){prompt=G.lvl===1?'<kbd>E</kbd>TAKE THE FREIGHT LIFT':'<kbd>E</kbd>OPEN THE DOOR';if(ePress){ePress=false;if(G.lvl===1)startL3();else startLevel2();return}}
-  if(FN){const pr=l3Windows(dt,cp,cf);if(G.state!=='play')return;if(pr)prompt=pr}
+  if(FN){const pr=l3Interact(dt,cp,cf);if(G.state!=='play')return;if(pr)prompt=pr}
   ePress=false;const pr=$('prompt');if(prompt){if(pr.innerHTML!==prompt)pr.innerHTML=prompt;pr.hidden=false}else pr.hidden=true;
   if(FN)return;
   // explore
@@ -2299,7 +2299,7 @@ function updateHUD(){
   $('stBar').style.width=G.stam.toFixed(0)+'%';$('stBar').classList.toggle('low',G.stam<25);
   const bt=`BATT ${Math.ceil(G.batt)}%`;if($('battOsd').textContent!==bt)$('battOsd').textContent=bt;$('battOsd').classList.toggle('low',G.batt<20);
   const tp='TAPES '+'▮'.repeat(G.tapes)+'▯'.repeat(Math.max(0,3-G.tapes));if($('tapesOsd').textContent!==tp)$('tapesOsd').textContent=tp;
-  const nt=G.lvl===2?(L3.exitWin?'CLIMB THROUGH THE OPEN WINDOW':`SIDES SEARCHED ${L3.sides?L3.sides.size:0}/4`):G.lvl===1?(G.exitOpen?'FIND THE FREIGHT LIFT':`BREAKERS ${G.brk}/3`):G.exitOpen?'FIND THE EXIT':`NOTES ${G.notes}/5`;if($('notesOsd').textContent!==nt)$('notesOsd').textContent=nt;
+  const nt=G.lvl===2?l3Hud():G.lvl===1?(G.exitOpen?'FIND THE FREIGHT LIFT':`BREAKERS ${G.brk}/3`):G.exitOpen?'FIND THE EXIT':`NOTES ${G.notes}/5`;if($('notesOsd').textContent!==nt)$('notesOsd').textContent=nt;
   const tc=fmtTime(G.time);if($('tc').textContent!==tc)$('tc').textContent=tc;
   const lt=!G.light?'LIGHT OFF':(G.flickOff>0?'LIGHT ▒▒▒':'LIGHT ON');if($('lightOsd').textContent!==lt)$('lightOsd').textContent=lt;
   const so=G.crouch?'CROUCH':(G.noise>10?'RUN':'SP');if($('stanceOsd').textContent!==so)$('stanceOsd').textContent=so;
@@ -2601,139 +2601,177 @@ function smileDeath(){
   $('goRetry').onclick=()=>retryLevel2()}
 
 /* ============ LEVEL 3: THE WINDOWS (Backrooms Level 188) ============
-   A hotel-like building around a huge courtyard: five floors of windows, most of them curtained. The thing from the
-   carpet followed you all the way down, and here it is taller than the building. It stands in the middle and sweeps a
-   searchlight out of its eyes. Stay out of the light: deep under the arcade, behind the hedges, under the gazebos.
-   Pull the curtains on the ground-floor windows: one of them will open onto the way out. */
+   You are inside now: the ground floor of a hotel that wraps all the way round a courtyard. One long corridor runs
+   round the ring, windows on one side, hotel rooms on the other. The thing from the carpet followed you down, and here
+   it is taller than the building. It stands out in the courtyard and its eyes throw a white beam, which it drags
+   along the windows, one wing at a time. Keep out of the beam: run, duck into the rooms, close the curtains.
+   Find the four fuses (one in each wing), bring them to the fuse box by the lift, and the north stair door unlocks. */
 const FIN={gs:null};// the scaled group the giant lives in
 const GSC=9;// the giant is the level 0 monster at nine times the size: taller than the building
-const L3={on:false,S:34,arc:4,win:[],col:[],cov:[],roofs:[],pulls:0,need:3,exitWin:null,peri:[],marker:null,dust:null,beam:null,light:null,lift:null,awake:false,deaths:0};
-const G3={state:'scan',t:0,pos:new V3(),vel:new V3(),yaw:Math.PI,look:new V3(0,0,20),lookT:new V3(0,0,20),scanA:0,scanDir:1,sus:0,lost:0,last:null,noise:null,noiseT:-99,slam:null,slamCool:2,roarT:0,hand:0};
+const L3={on:false,C:22,k:null,win:[],col:[],cov:[],fuses:[],got:0,ins:0,power:false,box:null,door:null,lamps:[],peri:[],dust:null,beam:null,light:null,eyes:null,lift:null,awake:false,deaths:0,lit:false};
+const G3={state:'sweep',t:0,pos:new V3(),vel:new V3(),yaw:0,look:new V3(),lookT:new V3(),wing:1,u:0,udir:1,pause:0,passes:0,sus:0,lost:0,last:null,lastW:1,lastU:0,noise:null,noiseT:-99,noiseW:0,slam:null,slamCool:3,graceT:0,stand:.4,hearT:0};
+const L3OUT=[[0,-1],[0,1],[-1,0],[1,0]];// the outward direction of each wing: north, south, west, east
+function l3W(i,u,c){const o=L3OUT[i];return o[0]===0?{x:u,z:o[1]*c}:{x:o[0]*c,z:u}}// wing coords (u along the wing, c out from the centre) to world x,z
+function l3UC(i,x,z){const o=L3OUT[i];return o[0]===0?{u:x,c:z*o[1]}:{u:z,c:x*o[0]}}
+function l3Wing(x,z){return Math.abs(x)>Math.abs(z)?(x<0?2:3):(z<0?0:1)}
 function finaleReset(){// put the level 0 monster back to normal size, wherever it is
   if(CR&&FIN.gs&&CR.root.parent===FIN.gs){scene.add(CR.root)}if(FIN.gs)FIN.gs.visible=false;L3.on=false;
-  if(L3.light){L3.light.intensity=0}if(L3.beam)L3.beam.visible=false;if(L3.marker)L3.marker.visible=false;
+  if(L3.light){L3.light.intensity=0;L3.light.visible=false}if(L3.moon){L3.moon.intensity=0;L3.moon.visible=false}if(L3.beam)L3.beam.visible=false;if(L3.eyes)L3.eyes.visible=false;if(L3.dust)L3.dust.visible=false;
   DYN.forEach(d=>{d.L.color.setHex(0xfff0c6);d.L.distance=9;d.L.decay=1.5});if(AC)monBus.gain.value=1;if(SMR.ok)SMR.root.visible=false}
 // ---- textures
 const L3TEX={};
-function l3Tex(){if(L3TEX.paving)return L3TEX;const R=mulberry(188);
+function l3Tex(){if(L3TEX.paving)return L3TEX;const R=mulberry(188),C=L3.C;
   L3TEX.paving=ctex(512,512,(g,w,h)=>{g.fillStyle='#5d5a52';g.fillRect(0,0,w,h);const t=w/4;
     for(let y=0;y<4;y++)for(let x=0;x<4;x++){const k=.85+R()*.25;g.fillStyle=`rgb(${110*k|0},${105*k|0},${94*k|0})`;g.fillRect(x*t+3,y*t+3,t-6,t-6);
       for(let i=0;i<500;i++){g.fillStyle=`rgba(${R()<.5?'40,38,30':'190,184,170'},${R()*.12})`;g.fillRect(x*t+R()*t,y*t+R()*t,2,2)}
-      if(R()<.3){g.fillStyle='rgba(60,80,40,.35)';for(let i=0;i<60;i++)g.fillRect(x*t+R()*t,y*t+(R()<.5?2:t-6),3,3)}}// moss in the joints
-    g.strokeStyle='rgba(25,24,20,.5)';for(let k=0;k<5;k++){let x=R()*w,y=R()*h;g.beginPath();g.moveTo(x,y);for(let s=0;s<14;s++){x+=(R()-.5)*30;y+=(R()-.5)*30;g.lineTo(x,y)}g.stroke()}},[68/5,68/5]);
+      if(R()<.3){g.fillStyle='rgba(60,80,40,.35)';for(let i=0;i<60;i++)g.fillRect(x*t+R()*t,y*t+(R()<.5?2:t-6),3,3)}}
+    g.strokeStyle='rgba(25,24,20,.5)';for(let k=0;k<5;k++){let x=R()*w,y=R()*h;g.beginPath();g.moveTo(x,y);for(let s=0;s<14;s++){x+=(R()-.5)*30;y+=(R()-.5)*30;g.lineTo(x,y)}g.stroke()}},[2*C/5,2*C/5]);
   L3TEX.plaster=ctex(512,512,(g,w,h)=>{g.fillStyle='#a99d82';g.fillRect(0,0,w,h);for(let i=0;i<26000;i++){g.fillStyle=`rgba(${R()<.5?'60,52,38':'230,222,200'},${R()*.06})`;g.fillRect(R()*w,R()*h,1.5,1.5)}
-    for(let i=0;i<10;i++){const x=R()*w,len=h*(.2+R()*.6);const gr=g.createLinearGradient(0,0,0,len);gr.addColorStop(0,'rgba(50,42,30,.35)');gr.addColorStop(1,'rgba(50,42,30,0)');g.fillStyle=gr;g.fillRect(x,0,3+R()*8,len)}
-    const bg=g.createLinearGradient(0,h*.85,0,h);bg.addColorStop(0,'rgba(30,26,18,0)');bg.addColorStop(1,'rgba(30,26,18,.45)');g.fillStyle=bg;g.fillRect(0,h*.85,w,h*.15)},[16,1]);
+    for(let i=0;i<10;i++){const x=R()*w,len=h*(.2+R()*.6);const gr=g.createLinearGradient(0,0,0,len);gr.addColorStop(0,'rgba(50,42,30,.35)');gr.addColorStop(1,'rgba(50,42,30,0)');g.fillStyle=gr;g.fillRect(x,0,3+R()*8,len)}});
+  // inside: faded striped wallpaper, a hotel carpet, dark wood
+  L3TEX.paper=ctex(256,256,(g,w,h)=>{g.fillStyle='#867a4c';g.fillRect(0,0,w,h);for(let x=0;x<w;x+=32){g.fillStyle='rgba(60,52,26,.22)';g.fillRect(x,0,10,h);g.fillStyle='rgba(205,190,130,.12)';g.fillRect(x+15,0,3,h)}
+    for(let y=16;y<h;y+=64)for(let x=16;x<w;x+=64){g.fillStyle='rgba(70,60,30,.28)';g.beginPath();g.ellipse(x+((y/64|0)%2)*32,y,5,9,0,0,7);g.fill()}
+    for(let i=0;i<9000;i++){g.fillStyle=`rgba(${R()<.5?'40,34,18':'220,206,160'},${R()*.07})`;g.fillRect(R()*w,R()*h,1.5,1.5)}
+    const gr=g.createLinearGradient(0,h*.8,0,h);gr.addColorStop(0,'rgba(40,30,15,0)');gr.addColorStop(1,'rgba(40,30,15,.3)');g.fillStyle=gr;g.fillRect(0,h*.8,w,h*.2)});
+  L3TEX.carpet=ctex(256,256,(g,w,h)=>{g.fillStyle='#4a1d18';g.fillRect(0,0,w,h);g.strokeStyle='rgba(160,115,60,.35)';g.lineWidth=3;
+    for(let y=0;y<h;y+=64)for(let x=0;x<w;x+=64){g.beginPath();g.moveTo(x+32,y+6);g.lineTo(x+58,y+32);g.lineTo(x+32,y+58);g.lineTo(x+6,y+32);g.closePath();g.stroke();g.fillStyle='rgba(20,8,6,.5)';g.fillRect(x+28,y+28,8,8)}
+    for(let i=0;i<14000;i++){g.fillStyle=`rgba(${R()<.5?'15,5,4':'120,60,40'},${R()*.15})`;g.fillRect(R()*w,R()*h,1.5,1.5)}});
+  L3TEX.wood=ctex(256,256,(g,w,h)=>{g.fillStyle='#4a3424';g.fillRect(0,0,w,h);for(let y=0;y<h;y+=2){g.fillStyle=`rgba(${R()<.5?'30,20,12':'110,80,55'},${R()*.18})`;g.fillRect(0,y,w,1+R()*2)}});
   L3TEX.hedge=ctex(256,256,(g,w,h)=>{g.fillStyle='#16210f';g.fillRect(0,0,w,h);for(let i=0;i<9000;i++){const v=R();g.fillStyle=`rgba(${30+v*40|0},${48+v*60|0},${20+v*25|0},${.5+R()*.5})`;g.beginPath();g.arc(R()*w,R()*h,1+R()*2.5,0,7);g.fill()}},[2,2]);
-  // the building's upper floors: one canvas per side, 16 bays x 4 floors, with a separate glow canvas
-  const types=['cur','cur','cur','cur','curD','dark','dark','open','lit'];
-  L3TEX.facades=[0,1,2,3].map(side=>{const W=2048,H=552,B=128,F=128;const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');const e=document.createElement('canvas');e.width=W;e.height=H;const ge=e.getContext('2d');
+  // the four upper floors of each side: 11 bays x 4 floors, with a separate glow canvas
+  const types=['cur','cur','cur','cur','curD','dark','dark','open','lit'],NB=11;
+  L3TEX.facades=[0,1,2,3].map(side=>{const W=2048,H=552,B=W/NB,F=128;const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');const e=document.createElement('canvas');e.width=W;e.height=H;const ge=e.getContext('2d');
     g.fillStyle='#9d917a';g.fillRect(0,0,W,H);for(let i=0;i<60000;i++){g.fillStyle=`rgba(${R()<.5?'55,48,36':'220,212,190'},${R()*.06})`;g.fillRect(R()*W,R()*H,1.5,1.5)}
     ge.fillStyle='#000';ge.fillRect(0,0,W,H);
-    g.fillStyle='#857a63';g.fillRect(0,0,W,40);g.fillStyle='rgba(40,34,24,.5)';g.fillRect(0,38,W,4);// parapet and cornice
+    g.fillStyle='#857a63';g.fillRect(0,0,W,40);g.fillStyle='rgba(40,34,24,.5)';g.fillRect(0,38,W,4);
     const wins=[];
-    for(let f=0;f<4;f++){const y0=40+f*F;g.fillStyle='rgba(60,52,38,.45)';g.fillRect(0,y0+F-6,W,6);// floor band
-      for(let b=0;b<16;b++){const x=b*B+B/2-24,y=y0+26,ww=48,hh=80,t=types[R()*types.length|0];
-        g.fillStyle='#3b342a';g.fillRect(x-5,y-5,ww+10,hh+12);g.fillStyle='#c9bfa6';g.fillRect(x-7,y+hh+3,ww+14,5);// frame and sill
+    for(let f=0;f<4;f++){const y0=40+f*F;g.fillStyle='rgba(60,52,38,.45)';g.fillRect(0,y0+F-6,W,6);
+      for(let b=0;b<NB;b++){const ww=64,hh=80,x=b*B+B/2-ww/2,y=y0+26,t=types[R()*types.length|0];
+        g.fillStyle='#3b342a';g.fillRect(x-5,y-5,ww+10,hh+12);g.fillStyle='#c9bfa6';g.fillRect(x-7,y+hh+3,ww+14,5);
         let col='#0b0a09',gl=null;
         if(t==='cur'){col='#b89a62';gl=`rgb(${150+R()*60|0},${110+R()*40|0},${55+R()*25|0})`}else if(t==='curD'){col='#4e4537'}else if(t==='open'){col='#141210'}else if(t==='lit'){col='#d8c48a';gl='#e8d090'}
-        g.fillStyle=col;g.fillRect(x,y,ww,hh);if(gl){ge.fillStyle=gl;ge.fillRect(x,y,ww,hh);ge.globalAlpha=1}
-        if(t==='cur'||t==='curD'){for(let k=0;k<7;k++){g.fillStyle=`rgba(0,0,0,${.08+R()*.12})`;g.fillRect(x+k*7,y,3,hh);ge.fillStyle='rgba(0,0,0,.25)';ge.fillRect(x+k*7,y,3,hh)}}
+        g.fillStyle=col;g.fillRect(x,y,ww,hh);if(gl){ge.fillStyle=gl;ge.fillRect(x,y,ww,hh)}
+        if(t==='cur'||t==='curD'){for(let k=0;k<9;k++){g.fillStyle=`rgba(0,0,0,${.08+R()*.12})`;g.fillRect(x+k*7,y,3,hh);ge.fillStyle='rgba(0,0,0,.25)';ge.fillRect(x+k*7,y,3,hh)}}
         if(t==='lit'){g.fillStyle='#6a5a38';g.fillRect(x,y+hh*.7,ww,hh*.3);ge.fillStyle='rgba(0,0,0,.4)';ge.fillRect(x,y+hh*.7,ww,hh*.3)}
         g.fillStyle='#2a251d';g.fillRect(x+ww/2-1,y,2,hh);g.fillRect(x,y+hh*.38,ww,2);ge.fillStyle='#000';ge.fillRect(x+ww/2-1,y,2,hh);ge.fillRect(x,y+hh*.38,ww,2);
-        wins.push({b,f,t})}}
-    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;const et=new THREE.CanvasTexture(e);et.colorSpace=THREE.SRGBColorSpace;return{tex,et,wins}});
-  // what you can see through a ground floor window, once its curtains are open
-  const view=(draw)=>ctex(256,320,draw);
-  const room=(g,w,h,wall,floor,ceil)=>{g.fillStyle=wall;g.fillRect(0,0,w,h);const ix=w*.28,iy=h*.24,iw=w*.44,ih=h*.46;
-    g.fillStyle=ceil;g.beginPath();g.moveTo(0,0);g.lineTo(w,0);g.lineTo(ix+iw,iy);g.lineTo(ix,iy);g.fill();
-    g.fillStyle=floor;g.beginPath();g.moveTo(0,h);g.lineTo(w,h);g.lineTo(ix+iw,iy+ih);g.lineTo(ix,iy+ih);g.fill();
-    g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.moveTo(0,0);g.lineTo(ix,iy);g.lineTo(ix,iy+ih);g.lineTo(0,h);g.fill();g.beginPath();g.moveTo(w,0);g.lineTo(ix+iw,iy);g.lineTo(ix+iw,iy+ih);g.lineTo(w,h);g.fill();return{ix,iy,iw,ih}};
-  L3TEX.views={
-    yellow:view((g,w,h)=>{const r=room(g,w,h,'#c9ae55','#a08a52','#c2ab62');g.fillStyle='#fffbe0';g.fillRect(r.ix+r.iw*.3,r.iy-14,r.iw*.4,8);for(let x=0;x<w;x+=10){g.fillStyle='rgba(255,250,210,.06)';g.fillRect(x,0,5,h)}}),
-    tunnel:view((g,w,h)=>{const r=room(g,w,h,'#3b3a35','#262521','#2c2b27');g.fillStyle='#365046';g.fillRect(r.ix,r.iy+r.ih*.6,r.iw,r.ih*.4);g.fillStyle='#ff3018';g.beginPath();g.arc(r.ix+r.iw*.8,r.iy+r.ih*.25,4,0,7);g.fill();g.fillStyle='#5b5040';g.fillRect(0,22,w,9)}),
-    hotel:view((g,w,h)=>{const r=room(g,w,h,'#5a3a2c','#3a2a20','#4a3a30');g.fillStyle='#c8b8a0';g.fillRect(r.ix+10,r.iy+r.ih*.6,r.iw-20,r.ih*.4);g.fillStyle='#ffd890';g.beginPath();g.arc(r.ix+r.iw*.85,r.iy+r.ih*.45,7,0,7);g.fill()}),
-    dark:view((g,w,h)=>{g.fillStyle='#050505';g.fillRect(0,0,w,h);g.fillStyle='#111';g.fillRect(w*.3,h*.25,w*.4,h*.5)}),
-    figure:[0,1].map(fr=>view((g,w,h)=>{const r=room(g,w,h,'#2a1612','#1a0e0b','#200f0c');g.fillStyle='#000';const cx=r.ix+r.iw/2;g.beginPath();g.ellipse(cx,r.iy+20,10,13,0,0,7);g.fill();g.fillRect(cx-9,r.iy+32,18,r.ih-30);
-      g.lineWidth=5;g.strokeStyle='#000';g.beginPath();g.moveTo(cx-8,r.iy+40);g.lineTo(cx-20,r.iy+r.ih-10);g.stroke();g.beginPath();g.moveTo(cx+8,r.iy+40);fr?(g.lineTo(cx+26,r.iy+28),g.lineTo(cx+30,r.iy+6)):(g.lineTo(cx+28,r.iy+40),g.lineTo(cx+40,r.iy+30));g.stroke()})),
-    exit:view((g,w,h)=>{const sky=g.createLinearGradient(0,0,0,h*.6);sky.addColorStop(0,'#0a0c12');sky.addColorStop(1,'#1d1a18');g.fillStyle=sky;g.fillRect(0,0,w,h);
-      g.fillStyle='#14120f';g.fillRect(0,h*.6,w,h*.4);const gr=g.createRadialGradient(w*.62,h*.3,4,w*.62,h*.3,110);gr.addColorStop(0,'rgba(255,170,70,.95)');gr.addColorStop(.25,'rgba(255,140,50,.35)');gr.addColorStop(1,'rgba(255,140,50,0)');g.fillStyle=gr;g.fillRect(0,0,w,h);
-      g.fillStyle='#222';g.fillRect(w*.62-2,h*.3,4,h*.42);const pr=g.createRadialGradient(w*.62,h*.82,2,w*.62,h*.82,70);pr.addColorStop(0,'rgba(255,150,60,.55)');pr.addColorStop(1,'rgba(255,150,60,0)');g.fillStyle=pr;g.fillRect(0,h*.6,w,h*.4);
-      g.fillStyle='rgba(255,220,160,.6)';for(let y=h*.66;y<h;y+=9)g.fillRect(w*.62-14,y,28,1);g.fillStyle='#2a2826';g.fillRect(w*.08,h*.55,w*.3,h*.12);g.fillStyle='rgba(255,60,40,.7)';g.fillRect(w*.1,h*.6,6,3);g.fillRect(w*.33,h*.6,6,3)})};
-  L3TEX.rain=ctex(128,256,(g,w,h)=>{g.clearRect(0,0,w,h);for(let i=0;i<120;i++){g.fillStyle=`rgba(200,210,230,${.15+R()*.35})`;g.fillRect(R()*w,R()*h,1,6+R()*14)}});
-  L3TEX.curtain=ctex(128,256,(g,w,h)=>{const gr=g.createLinearGradient(0,0,w,0);for(let k=0;k<=8;k++)gr.addColorStop(k/8,k%2?'#7a6040':'#c8a468');g.fillStyle=gr;g.fillRect(0,0,w,h);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(0,h-10,w,10)});
+        wins.push({b,f,t,px:x+ww/2,py:y+hh*.55})}}
+    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;const et=new THREE.CanvasTexture(e);et.colorSpace=THREE.SRGBColorSpace;return{tex,et,wins,W,H}});
+  L3TEX.curtain=ctex(128,256,(g,w,h)=>{const gr=g.createLinearGradient(0,0,w,0);for(let k=0;k<=8;k++)gr.addColorStop(k/8,k%2?'#6e2a22':'#a4483a');g.fillStyle=gr;g.fillRect(0,0,w,h);for(let i=0;i<3000;i++){g.fillStyle=`rgba(${R()<.5?'20,5,4':'200,120,100'},${R()*.08})`;g.fillRect(R()*w,R()*h,1.5,1.5)}g.fillStyle='rgba(0,0,0,.3)';g.fillRect(0,h-8,w,8)});
   L3TEX.peri=ctex(64,128,(g,w,h)=>{g.clearRect(0,0,w,h);g.fillStyle='rgba(0,0,0,.92)';g.beginPath();g.ellipse(32,22,10,13,0,0,7);g.fill();g.beginPath();g.moveTo(18,36);g.lineTo(46,36);g.lineTo(50,128);g.lineTo(14,128);g.fill()});
-  L3TEX.marker=ctex(256,256,(g,w,h)=>{const gr=g.createRadialGradient(128,128,40,128,128,128);gr.addColorStop(0,'rgba(255,40,20,0)');gr.addColorStop(.7,'rgba(255,40,20,.25)');gr.addColorStop(.92,'rgba(255,60,30,.9)');gr.addColorStop(1,'rgba(255,60,30,0)');g.fillStyle=gr;g.fillRect(0,0,w,h)});
+  L3TEX.glow=ctex(128,128,(g,w,h)=>{const gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.18,'rgba(235,240,255,.85)');gr.addColorStop(.45,'rgba(180,200,255,.22)');gr.addColorStop(1,'rgba(160,180,255,0)');g.fillStyle=gr;g.fillRect(0,0,w,h)});
+  L3TEX.sign=ctex(256,64,(g,w,h)=>{g.fillStyle='#0d1a10';g.fillRect(0,0,w,h);g.fillStyle='#39d06a';g.font='bold 34px monospace';g.textAlign='center';g.textBaseline='middle';g.fillText('STAIRS ▲',w/2,h/2+2)});
   return L3TEX}
-// ---- the searchlight from its eyes: a real shadow-casting spot plus a faint visible cone
-function l3Light(){if(L3.light)return;L3.moon=new THREE.DirectionalLight(0x8a9cc8,0);L3.moon.position.set(-30,60,20);scene.add(L3.moon);const L=new THREE.SpotLight(0xe6ecff,0,110,.2,.45,1);L.castShadow=true;L.shadow.mapSize.set(1024,1024);L.shadow.camera.near=2;L.shadow.camera.far=110;L.shadow.bias=-.0006;L.shadow.normalBias=.03;scene.add(L,L.target);L3.light=L;
+// a box with its UVs in metres, so long walls don't stretch the texture
+function l3UV(geo,sx,sy,sz,tile){const uv=geo.attributes.uv;const dims=[[sz,sy],[sz,sy],[sx,sz],[sx,sz],[sx,sy],[sx,sy]];for(let f=0;f<6;f++)for(let k=0;k<4;k++){const i=f*4+k;uv.setXY(i,uv.getX(i)*dims[f][0]/tile,uv.getY(i)*dims[f][1]/tile)}uv.needsUpdate=true;return geo}
+// ---- the beam from its eyes: a real shadow-casting spot, a faint visible cone, and two glowing eyes
+function l3Light(){if(L3.light)return;const T=l3Tex();
+  L3.moon=new THREE.DirectionalLight(0x8a9cc8,0);L3.moon.position.set(-25,55,40);L3.moon.castShadow=true;L3.moon.shadow.mapSize.set(1024,1024);const sc=L3.moon.shadow.camera;sc.left=sc.bottom=-(L3.C+9);sc.right=sc.top=L3.C+9;sc.near=1;sc.far=170;L3.moon.shadow.bias=-.0008;L3.moon.shadow.normalBias=.04;scene.add(L3.moon,L3.moon.target);L3.moon.visible=false;
+  const L=new THREE.SpotLight(0xe6ecff,0,120,.17,.4,1);L.castShadow=true;L.shadow.mapSize.set(1024,1024);L.shadow.camera.near=1.5;L.shadow.camera.far=120;L.shadow.bias=-.0005;L.shadow.normalBias=.03;scene.add(L,L.target);L3.light=L;L.visible=false;
   const geo=new THREE.ConeGeometry(1,1,40,1,true);geo.translate(0,-.5,0);geo.rotateX(-Math.PI/2);
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,uniforms:{uC:{value:new THREE.Color(0xdfe6ff)},uA:{value:.1}},
     vertexShader:`varying float vZ;varying vec3 vN;varying vec3 vV;void main(){vZ=position.z;vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`,
-    fragmentShader:`uniform vec3 uC;uniform float uA;varying float vZ;varying vec3 vN;varying vec3 vV;void main(){float f=pow(abs(dot(normalize(vN),normalize(vV))),1.6);float a=smoothstep(0.,.06,vZ)*pow(1.-vZ,1.3)*f*uA;gl_FragColor=vec4(uC*a,1.);}`});
-  L3.beam=new THREE.Mesh(geo,m);L3.beam.frustumCulled=false;L3.beam.renderOrder=6;scene.add(L3.beam)}
-// ---- build the courtyard
+    fragmentShader:`uniform vec3 uC;uniform float uA;varying float vZ;varying vec3 vN;varying vec3 vV;void main(){float f=pow(abs(dot(normalize(vN),normalize(vV))),2.2);float a=smoothstep(0.,.05,vZ)*mix(1.,.6,vZ)*f*uA;gl_FragColor=vec4(uC*a,1.);}`});
+  L3.beam=new THREE.Mesh(geo,m);L3.beam.frustumCulled=false;L3.beam.renderOrder=6;L3.beam.visible=false;scene.add(L3.beam);
+  const eg=new THREE.Group();const sm=(s,o)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow,color:0xeef2ff,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,toneMapped:false,opacity:o}));sp.scale.setScalar(s);sp.renderOrder=7;eg.add(sp);return sp};
+  L3.eyeS=[[sm(6,.5),sm(2.2,1)],[sm(6,.5),sm(2.2,1)]];L3.eyes=eg;L3.faceL=new THREE.PointLight(0xdfe6ff,0,11,1.8);eg.add(L3.faceL);eg.visible=false;scene.add(eg)}
+// ---- build the hotel: a ring of corridor round the courtyard, rooms on the outside
 function buildL3(){
-  levelGroup.traverse(o=>{if(o.userData&&o.userData.regionGeo)o.geometry.dispose()});levelGroup.clear();const T=l3Tex(),M=l2Mats(),S=L3.S,A=L3.arc,m=new THREE.Matrix4(),q=new Q(),one=new V3(1,1,1);
-  L3.win=[];L3.col=[];L3.cov=[];L3.roofs=[];L3.peri=[];L3.pulls=0;L3.sides=new Set();L3.need=3+(rnd()<.5?1:0);L3.exitWin=null;L3.awake=false;
-  const stdM=(map,o)=>new THREE.MeshStandardMaterial(Object.assign({map,roughness:.9},o||{}));
+  levelGroup.traverse(o=>{if(o.userData&&o.userData.regionGeo)o.geometry.dispose()});levelGroup.clear();const T=l3Tex(),M=l2Mats(),C=L3.C;
+  const cIn=C+.3,cRw=C+3.3,cRm=C+3.5,cOw=C+7.8,cOe=C+8.1,CH=3.3;L3.k={cIn,cRw,cRm,cOw,cOe,CH};
+  Object.assign(L3,{win:[],col:[],cov:[],fuses:[],lamps:[],peri:[],got:0,ins:0,power:false,awake:false,lit:false,lockedT:0});
   const add=(o,shadow)=>{o.castShadow=!!shadow;o.receiveShadow=true;levelGroup.add(o);return o};
-  const box=(x0,y0,z0,x1,y1,z1,mat,opt)=>{const b=add(new THREE.Mesh(new THREE.BoxGeometry(x1-x0,y1-y0,z1-z0),mat),true);b.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);opt=opt||{};
-    if(opt.cov)L3.cov.push({x0,y0,z0,x1,y1,z1});if(opt.col)L3.col.push({x0,z0,x1,z1});if(opt.roof){L3.roofs.push({x0,z0,x1,z1,y:y0});b.userData.overhead=true}return b};
-  // ground
-  const ground=add(new THREE.Mesh(new THREE.PlaneGeometry(2*S,2*S).rotateX(-Math.PI/2),envDetail(stdM(T.paving,{roughness:.82}),'ceil')));
-  // walls: the plain ground floor, then four floors of windows
-  const plasterM=envDetail(stdM(T.plaster),'wall');
-  const sides=[{n:[0,1],c:[0,-S]},{n:[0,-1],c:[0,S]},{n:[1,0],c:[-S,0]},{n:[-1,0],c:[S,0]}];// north, south, west, east (normal points into the courtyard)
-  sides.forEach((sd,i)=>{const yaw=Math.atan2(sd.n[0],sd.n[1]);
-    const gw=add(new THREE.Mesh(new THREE.PlaneGeometry(2*S,4.3),plasterM));gw.position.set(sd.c[0],2.15,sd.c[1]);gw.rotation.y=yaw;
+  const mat=(map,tile,o)=>{const m=new THREE.MeshStandardMaterial(Object.assign({map,roughness:.9},o||{}));m.userData.tile=tile;return m};
+  const paperM=envDetail(mat(T.paper,1.5),'wall'),plasterM=envDetail(mat(T.plaster,3,{color:0xb8ae96}),'wall'),carpetM=envDetail(mat(T.carpet,1.4,{roughness:.95}),'ceil'),ceilM=mat(T.plaster,2.5,{color:0x7a7262}),woodM=mat(T.wood,1.2,{roughness:.7}),frameM=new THREE.MeshStandardMaterial({color:0x2a2018,roughness:.6});
+  const outF={'0,-1':5,'0,1':4,'-1,0':1,'1,0':0};// which box face looks outward (into the corridor) for each wing
+  // box in world coords; mats can be one material, or [inside, outside, faceIndexInside] for walls with two faces
+  const box=(x0,y0,z0,x1,y1,z1,m,opt)=>{opt=opt||{};let b=null;
+    if(m){const sx=x1-x0,sy=y1-y0,sz=z1-z0;let mm=m,tile=(m.userData&&m.userData.tile)||2;if(Array.isArray(m)){mm=[0,1,2,3,4,5].map(f=>f===m[2]?m[0]:f===(m[2]^1)?m[1]:m[3]||m[1]);tile=m[0].userData.tile||2}
+      b=add(new THREE.Mesh(l3UV(new THREE.BoxGeometry(sx,sy,sz),sx,sy,sz,tile),mm),opt.shadow!==false);b.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2)}
+    if(opt.cov)L3.cov.push({x0,y0,z0,x1,y1,z1});if(opt.col)L3.col.push({x0,z0,x1,z1});return b};
+  const wb=(i,u0,u1,c0,c1,y0,y1,m,opt)=>{const a=l3W(i,u0,c0),b=l3W(i,u1,c1);return box(Math.min(a.x,b.x),y0,Math.min(a.z,b.z),Math.max(a.x,b.x),y1,Math.max(a.z,b.z),m,opt)};
+  const plane=(i,u0,u1,c0,c1,y,m,down)=>{const a=l3W(i,u0,c0),b=l3W(i,u1,c1);const x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),z0=Math.min(a.z,b.z),z1=Math.max(a.z,b.z);
+    const g=new THREE.PlaneGeometry(x1-x0,z1-z0);const uv=g.attributes.uv,t=m.userData.tile||2;for(let k=0;k<uv.count;k++)uv.setXY(k,uv.getX(k)*(x1-x0)/t,uv.getY(k)*(z1-z0)/t);g.rotateX(down?Math.PI/2:-Math.PI/2);const p=add(new THREE.Mesh(g,m),!!down);p.position.set((x0+x1)/2,y,(z0+z1)/2);if(down)p.userData.overhead=true;return p};
+  // the courtyard floor
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2*C,2*C).rotateX(-Math.PI/2),envDetail(new THREE.MeshStandardMaterial({map:T.paving,roughness:.82}),'ceil')));
+  const NW=11,ROOMS=7,rw=2*cRm/ROOMS;L3.rw=rw;
+  for(let i=0;i<4;i++){const o=L3OUT[i],fi=outF[o.join(',')],full=i<2,ue=full?cOe:cIn;
+    // floor and ceiling of this wing (north and south take the corners)
+    plane(i,-ue,ue,cIn,cOe,.001,carpetM);plane(i,-ue,ue,cIn,cOe,CH,ceilM,true);
+    // a dark band between the ceiling and the upper facade, and the facade itself (four floors of windows)
     const F=T.facades[i];const fm=new THREE.MeshStandardMaterial({map:F.tex,emissiveMap:F.et,emissive:0xffffff,emissiveIntensity:1.25,roughness:.92});
-    const fw=add(new THREE.Mesh(new THREE.PlaneGeometry(2*S,15.3),fm));fw.position.set(sd.c[0],4.3+15.3/2,sd.c[1]);fw.rotation.y=yaw;
-    // a few of the upper windows have someone standing in them, but only at the edge of your vision
+    const fw=add(new THREE.Mesh(new THREE.PlaneGeometry(2*C,15.3),fm));const fp=l3W(i,0,C-.02);fw.position.set(fp.x,4.3+15.3/2,fp.z);fw.rotation.y=Math.atan2(-o[0],-o[1]);
     const pm=new THREE.MeshBasicMaterial({map:T.peri,transparent:true,depthWrite:false});
-    F.wins.filter(w=>w.t==='lit'||w.t==='cur').slice(0,3).forEach(w=>{const u=-S+(w.b+.5)*(2*S/16),y=4.3+15.3-(40+w.f*128+66)/552*15.3;const p=new THREE.Mesh(new THREE.PlaneGeometry(.7,1.6),pm.clone());
-      const tx=-sd.n[1],tz=sd.n[0];p.position.set(sd.c[0]+tx*u*(i===2?-1:i===3?1:i===1?-1:1)+sd.n[0]*.06,y,sd.c[1]+tz*u*(i===2?-1:i===3?1:i===1?-1:1)+sd.n[1]*.06);p.rotation.y=yaw;levelGroup.add(p);L3.peri.push({mesh:p,a:0})})});
-  // the arcade round the ground floor: columns, a roof deep enough to hide under, and a few collapsed stretches
-  const colM=envDetail(stdM(T.plaster,{color:0xd8d0bc}),'wall');const roofM=envDetail(stdM(T.plaster,{color:0x8e8470}),'wall');const rubM=envDetail(stdM(T.paving,{color:0xa09a8c}),'wall');
-  const inner=S-A;
-  sides.forEach((sd,i)=>{const along=sd.n[0]===0;const gaps=[];const ng=2;for(let k=0;k<ng;k++){let g;do{g=2+(rnd()*12|0)}while(gaps.some(x=>Math.abs(x-g)<3)||(i===1&&g>=6&&g<=9));gaps.push(g)}
-    for(let b=0;b<16;b++){const u0=-S+b*(2*S/16),u1=u0+2*S/16;const gap=gaps.some(g=>b===g||b===g+1);
-      const R=(a0,a1,c0,c1,y0,y1,mat,opt)=>along?box(a0,y0,c0,a1,y1,c1,mat,opt):box(c0,y0,a0,c1,y1,a1,mat,opt);
-      const cIn=sd.c[along?1:0]+(along?sd.n[1]:sd.n[0])*A,cWall=sd.c[along?1:0];const c0=Math.min(cIn,cWall),c1=Math.max(cIn,cWall);
-      // column
-      const ca=u0,cc=cIn;if(!(i===1&&Math.abs(u0)<.1)){along?box(ca-.35,0,cc-.35,ca+.35,3.2,cc+.35,colM,{col:1}):box(cc-.35,0,ca-.35,cc+.35,3.2,ca+.35,colM,{col:1})}
-      if(!gap){R(u0,u1,c0,c1,3.2,3.6,roofM,{cov:1,roof:1});const fc=cIn<cWall?[cIn,cIn+.3]:[cIn-.3,cIn];R(u0,u1,fc[0],fc[1],2.6,3.2,roofM,{cov:1})}
-      else{// fallen roof: rubble you have to step round
-        const rc=(c0+c1)/2+(rnd()-.5);const len=1.5+rnd()*1.6;R(u0+.6,u0+.6+len,rc-.7,rc+.7,0,.5+rnd()*.5,rubM,{col:1});if(rnd()<.6){const o=u0+2.6+rnd();R(o,o+1.2,c0+.4,c0+1.5,0,.4,rubM,{col:1})}}}});
-  // corner pillars
-  for(const sx of[-1,1])for(const sz of[-1,1])box(sx*inner-.4,0,sz*inner-.4,sx*inner+.4,3.6,sz*inner+.4,colM,{col:1});
-  // ground floor windows (between the columns), all curtained
-  const frameM=new THREE.MeshStandardMaterial({color:0x3a3228,roughness:.6});const curM=new THREE.MeshBasicMaterial({map:T.curtain,color:0x9a8a70});
-  sides.forEach((sd,i)=>{const along=sd.n[0]===0,yaw=Math.atan2(sd.n[0],sd.n[1]);for(let b=1;b<15;b++){if(i===1&&(b===7||b===8))continue;if(rnd()<.12)continue;
-    const u=-S+(b+.5)*(2*S/16);const pos=along?new V3(u,2.0,sd.c[1]+sd.n[1]*.04):new V3(sd.c[0]+sd.n[0]*.04,2.0,u);
-    const g=new THREE.Group();g.position.copy(pos);g.rotation.y=yaw;levelGroup.add(g);
-    const fr=new THREE.Mesh(new THREE.BoxGeometry(2.0,2.5,.1),frameM);fr.position.z=-.02;g.add(fr);
-    const vw=new THREE.Mesh(new THREE.PlaneGeometry(1.76,2.26),new THREE.MeshBasicMaterial({map:T.views.dark,toneMapped:false}));vw.position.z=.035;g.add(vw);
-    const curs=[-1,1].map(s=>{const c=new THREE.Mesh(new THREE.PlaneGeometry(.9,2.26),curM.clone());c.position.set(s*.44,0,.05);g.add(c);return c});
-    const sill=new THREE.Mesh(new THREE.BoxGeometry(2.1,.08,.25),new THREE.MeshStandardMaterial({color:0xc8bea6,roughness:.7}));sill.position.set(0,-1.17,.1);g.add(sill);
-    const lit=rnd()<.6;curs.forEach(c=>c.material.color.setHex(lit?0xd8b878:0x5a5040));
-    L3.win.push({g,vw,curs,pos:pos.clone().addScaledVector(new V3(sd.n[0],0,sd.n[1]),.5).setY(1.6),n:new V3(sd.n[0],0,sd.n[1]),side:i,lit,state:'closed',t:0,view:null,ft:0})}});
-  // the courtyard: a dry fountain in the middle (where it stands), tall hedges, gazebos, benches and dead lamps
-  const stoneM=envDetail(stdM(T.paving,{color:0xb8b0a0}),'wall');
-  {const ring=add(new THREE.Mesh(new THREE.CylinderGeometry(7.4,7.6,.75,48,1,true),stoneM),true);ring.position.y=.375;const ring2=add(new THREE.Mesh(new THREE.CylinderGeometry(6.9,6.9,.75,48,1,true),stoneM));ring2.position.y=.375;ring2.material=stoneM;
-    const top=add(new THREE.Mesh(new THREE.RingGeometry(6.9,7.5,48).rotateX(-Math.PI/2),stoneM));top.position.y=.75;const basin=add(new THREE.Mesh(new THREE.CircleGeometry(6.9,48).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x2a2620,roughness:.95})));basin.position.y=.02}
-  const hedgeM=new THREE.MeshStandardMaterial({map:T.hedge,roughness:1,color:0x9aa890});
-  const planter=(x,z,w,d)=>{box(x-w/2-.2,0,z-d/2-.2,x+w/2+.2,.9,z+d/2+.2,stoneM,{col:1});box(x-w/2,.9,z-d/2,x+w/2,3.5,z+d/2,hedgeM,{cov:1})};
-  const used=[];const free=(x,z,r)=>Math.hypot(x,z)>11&&Math.abs(x)<inner-3&&Math.abs(z)<inner-3&&!used.some(u=>Math.hypot(u[0]-x,u[1]-z)<r+u[2])&&!(Math.abs(x)<3&&z>20);
-  // gazebos on the diagonals
-  for(const[sx,sz]of[[1,1],[-1,1],[1,-1],[-1,-1]]){const x=sx*15,z=sz*15;used.push([x,z,4]);for(const px of[-1,1])for(const pz of[-1,1])box(x+px*2.1-.15,0,z+pz*2.1-.15,x+px*2.1+.15,3,z+pz*2.1+.15,colM,{col:1});
-    box(x-2.5,3,z-2.5,x+2.5,3.35,z+2.5,roofM,{cov:1,roof:1});const pr=add(new THREE.Mesh(new THREE.ConeGeometry(3.6,1.4,4),roofM),true);pr.position.set(x,4.05,z);pr.rotation.y=Math.PI/4;pr.userData.overhead=true;
-    box(x-1.2,0,z-.3,x+1.2,.45,z+.3,new THREE.MeshStandardMaterial({color:0x3a2a1c,roughness:.8}))}
-  let tries=0;while(used.length<4+14&&tries++<500){const a=rnd()*6.28,r=12+rnd()*15,x=Math.cos(a)*r,z=Math.sin(a)*r,w=rnd()<.5?5:2.4,d=w===5?2.2:2.4;const rot=rnd()<.5;const W=rot?d:w,D=rot?w:d;if(!free(x,z,Math.max(W,D)/2+2.6))continue;used.push([x,z,Math.max(W,D)/2]);planter(x,z,W,D)}
-  for(let k=0;k<10;k++){const a=rnd()*6.28,r=9+rnd()*18,x=Math.cos(a)*r,z=Math.sin(a)*r;if(!free(x,z,1.6))continue;used.push([x,z,1]);const b=box(x-.9,0,z-.25,x+.9,.45,z+.25,new THREE.MeshStandardMaterial({color:0x3a2a1c,roughness:.8}),{col:1});}
-  for(let k=0;k<8;k++){const a=k/8*6.28+.2,x=Math.cos(a)*10.5,z=Math.sin(a)*10.5;const p=add(new THREE.Mesh(new THREE.CylinderGeometry(.08,.11,4.2,8),M.metal),true);p.position.set(x,2.1,z);const h=add(new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshStandardMaterial({color:0x2a2a28,roughness:.3})));h.position.set(x,4.3,z)}
-  // the lift you arrive in, set into the south wall
-  {const g=new THREE.Group();const cabM=new THREE.MeshStandardMaterial({color:0x54574f,roughness:.5,metalness:.6});
+    F.wins.filter(w=>w.t==='lit'||w.t==='cur').slice(0,3).forEach(w=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(.75,1.6),pm.clone());p.position.set(-C+w.px/F.W*2*C,7.65-w.py/F.H*15.3,.06);fw.add(p);L3.peri.push({mesh:p,a:0})});
+    wb(i,-cIn,cIn,C,cIn,4.3,19.6,null,{cov:1});// the wall above, for line of sight
+    // the inner wall: solid between the windows, a sill below and a lintel above each opening
+    const wallM=[paperM,plasterM,fi];let u=-cIn;
+    for(let k=0;k<NW;k++){const wu=-20+4*k;wb(i,u,wu-.9,C,cIn,0,4.3,wallM,{cov:1});wb(i,wu-.9,wu+.9,C,cIn,0,.9,wallM,{cov:1});wb(i,wu-.9,wu+.9,C,cIn,2.5,4.3,wallM,{cov:1});u=wu+.9;
+      // the window: frame, mullions, a curtain rod and two curtains on the inside
+      const g=new THREE.Group();const gp=l3W(i,wu,cIn+.1);g.position.set(gp.x,0,gp.z);g.rotation.y=Math.atan2(o[0],o[1]);levelGroup.add(g);// local +z points into the corridor, local x along the wing
+      const fr=(x,y,w,h)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,.12),frameM);b.position.set(x,y,-.25);b.castShadow=true;g.add(b)};
+      fr(0,.92,1.84,.08);fr(0,2.48,1.84,.08);fr(-.88,1.7,.08,1.6);fr(.88,1.7,.08,1.6);fr(0,1.7,.05,1.56);fr(0,1.95,1.76,.05);
+      const rod=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,2.3,6).rotateZ(Math.PI/2),M.metal);rod.position.set(0,2.66,.02);g.add(rod);
+      const cm=new THREE.MeshStandardMaterial({map:T.curtain,roughness:.95,side:THREE.DoubleSide,shadowSide:THREE.DoubleSide});
+      const curs=[-1,1].map(s=>{const c=new THREE.Mesh(new THREE.PlaneGeometry(1,1.85),cm);c.position.set(s*.5,1.72,0);c.castShadow=true;c.receiveShadow=true;g.add(c);return c});
+      const closed=rnd()<.3?1:0;const hp=l3W(i,wu,cIn+.15),cp=l3W(i,wu,C+.15),ip=l3W(i,wu,C+1.5);
+      const ca=l3W(i,wu-.95,cIn+.04),cb=l3W(i,wu+.95,cIn+.16);
+      const w={i,u:wu,g,curs,want:closed,k:closed,state:'ok',pos:new V3(cp.x,1.7,cp.z),hand:new V3(hp.x,1.75,hp.z),inner:new V3(ip.x,1.1,ip.z),n:new V3(-o[0],0,-o[1]),
+        cov:{x0:Math.min(ca.x,cb.x),z0:Math.min(ca.z,cb.z),x1:Math.max(ca.x,cb.x),z1:Math.max(ca.z,cb.z),y0:.85,y1:2.65}};
+      l3Curtain(w,0);L3.win.push(w)}
+    wb(i,u,cIn,C,cIn,0,4.3,wallM,{cov:1});wb(i,-cIn,cIn,C,cIn,0,0,null,{col:1});
+    // the corridor's other wall: a door into every room
+    let v=-cRm;const roomWall=[paperM,paperM,fi];
+    for(let k=0;k<ROOMS;k++){const uc=-cRm+(k+.5)*rw;const lobby=i===1&&k===3,stair=i===0&&k===3;const dw=lobby?1.6:.6;
+      wb(i,v,uc-dw,cRw,cRm,0,CH,roomWall,{cov:1,col:1});wb(i,uc-dw,uc+dw,cRw,cRm,2.25,CH,roomWall,{cov:1});v=uc+dw;
+      // door frame
+      for(const s of[-1,1])wb(i,uc+s*dw-.05,uc+s*dw+.05,cRw-.04,cRm+.04,0,2.25,woodM);
+      if(k>0)wb(i,-cRm+k*rw-.1,-cRm+k*rw+.1,cRm,cOw,0,CH,[paperM,paperM,fi],{cov:1,col:1});// partition between rooms
+      if(stair){const dp=l3W(i,uc-.6,cRw+.12);const piv=new THREE.Group();piv.position.set(dp.x,0,dp.z);piv.rotation.y=0;levelGroup.add(piv);
+        const dm=new THREE.Mesh(new THREE.BoxGeometry(1.2,2.22,.07),new THREE.MeshStandardMaterial({color:0x4a4f4c,roughness:.45,metalness:.6}));dm.position.set(.6,1.11,0);dm.castShadow=true;piv.add(dm);
+        const hd=new THREE.Mesh(new THREE.BoxGeometry(.12,.04,.08),M.metal);hd.position.set(1.05,1.05,.08);piv.add(hd);
+        const lamp=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.04),new THREE.MeshBasicMaterial({color:0xff2a1a,toneMapped:false}));const lp=l3W(i,uc+.85,cRw-.03);lamp.position.set(lp.x,1.35,lp.z);levelGroup.add(lamp);
+        const sg=new THREE.Mesh(new THREE.PlaneGeometry(.9,.22),new THREE.MeshBasicMaterial({map:T.sign,toneMapped:false,color:0x666666}));const sp=l3W(i,uc,cRw-.02);sg.position.set(sp.x,2.55,sp.z);sg.rotation.y=Math.atan2(-o[0],-o[1]);levelGroup.add(sg);
+        const blk=wb(i,uc-.6,uc+.6,cRw,cRm,0,0,null,{col:1});L3.door={pos:new V3(l3W(i,uc,cRw-.6).x,1.2,l3W(i,uc,cRw-.6).z),piv,lamp,sign:sg,col:L3.col[L3.col.length-1],i,uc};
+        // behind it: concrete stairs going up into the dark
+        const stM=new THREE.MeshStandardMaterial({color:0x5c5a54,roughness:.9});for(let s=0;s<9;s++)wb(i,uc-1,uc+1,cRm+.9+s*.35,cRm+1.25+s*.35,0,.18*(s+1),stM)}
+      if(lobby)L3.lobby={i,uc}
+      // furniture, and maybe a fuse
+      if(!lobby&&!stair){const fur=[];const r0=-cRm+k*rw+.4,r1=r0+rw-.8;const bedL=rnd()<.5;
+        const bu=bedL?r0+1.0:r1-1.0;wb(i,bu-.8,bu+.8,cOw-2.1,cOw,0,.5,woodM,{col:1});wb(i,bu-.75,bu+.75,cOw-2.05,cOw-.05,.5,.62,mat(T.plaster,1,{color:0x8c8270}));fur.push([bu,cOw-1.1,.66]);
+        const au=bedL?r1-.45:r0+.45;if(rnd()<.8){wb(i,au-.4,au+.4,cOw-.65,cOw,0,2.05,woodM,{col:1,cov:1})}
+        const du=bedL?r1-1.6:r0+1.6;if(rnd()<.7){wb(i,du-.5,du+.5,cRm+.1,cRm+.6,0,.75,woodM,{col:1});fur.push([du,cRm+.35,.78])}
+        L3.rooms=L3.rooms||[];L3.rooms.push({i,k,uc,fur})}}
+    wb(i,v,cRm,cRw,cRm,0,CH,roomWall,{cov:1,col:1});
+    wb(i,cRm,cRm+.2,cRm,cOw,0,CH,[paperM,paperM,fi],{col:1});wb(i,-cRm-.2,-cRm,cRm,cOw,0,CH,[paperM,paperM,fi],{col:1});// end walls
+    // outer wall (the lift sits in the middle of the south one)
+    const outM=[plasterM,paperM,fi];if(i===1){wb(i,-cOe,-1.65,cOw,cOe,0,CH,outM,{col:1});wb(i,1.65,cOe,cOw,cOe,0,CH,outM,{col:1});wb(i,-1.65,1.65,cOw,cOe,3.2,CH,outM);wb(i,-1.65,1.65,cOw,cOe,0,0,null,{col:1})}
+    else wb(i,-cOe,cOe,cOw,cOe,0,CH,outM,{col:1});
+    // ceiling lamps down the corridor
+    for(let k=0;k<6;k++){const lu=-20+8*k,lp=l3W(i,lu,C+1.8);const lm=new THREE.MeshStandardMaterial({color:0x2a2620,emissive:0xffd9a0,emissiveIntensity:0,roughness:.5});const lx=new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.08,12),lm);lx.position.set(lp.x,CH-.05,lp.z);levelGroup.add(lx);
+      L3.lamps.push({pos:new V3(lp.x,CH-.25,lp.z),m:lm,alive:rnd()<.7,ph:rnd()*9})}}
+  // the fuses: one in a room in every wing
+  L3.rooms=L3.rooms||[];
+  for(let i=0;i<4;i++){const rs=L3.rooms.filter(r=>r.i===i);const r=pick(rs);const spot=pick(r.fur);const p=l3W(i,spot[0]+(rnd()-.5)*.6,spot[1]);
+    const g=new THREE.Group();g.position.set(p.x,spot[2]+.04,p.z);const gl=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.16,10).rotateZ(Math.PI/2),new THREE.MeshStandardMaterial({color:0xc8a060,roughness:.2,metalness:.3,emissive:0x704010,emissiveIntensity:.6}));g.add(gl);
+    for(const s of[-1,1]){const cap=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.04,10).rotateZ(Math.PI/2),M.metal);cap.position.x=s*.09;g.add(cap)}
+    const gs=new THREE.Sprite(new THREE.SpriteMaterial({map:T.glow,color:0xffb050,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,opacity:.6}));gs.scale.setScalar(.5);g.add(gs);levelGroup.add(g);
+    L3.fuses.push({i,pos:g.position.clone(),g,gs,taken:false})}
+  L3.rooms=null;
+  // the fuse box in the lift lobby
+  {const p=l3W(1,-2.4,cOw-.09);const g=new THREE.Group();g.position.set(p.x,1.45,p.z);g.rotation.y=Math.PI;levelGroup.add(g);
+    const bx=new THREE.Mesh(new THREE.BoxGeometry(.7,.9,.16),new THREE.MeshStandardMaterial({color:0x6a6e66,roughness:.5,metalness:.5}));g.add(bx);
+    const slots=[0,1,2,3].map(k=>{const s=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.02),new THREE.MeshBasicMaterial({color:0x401008,toneMapped:false}));s.position.set(-.24+k*.16,.25,.09);g.add(s);return s});
+    const lab=new THREE.Mesh(new THREE.PlaneGeometry(.5,.12),new THREE.MeshBasicMaterial({map:ctex(128,32,(gg,w,h)=>{gg.fillStyle='#d8d0b8';gg.fillRect(0,0,w,h);gg.fillStyle='#200';gg.font='bold 15px monospace';gg.textAlign='center';gg.fillText('N. STAIR LOCK',w/2,21)}),color:0x777777}));lab.position.set(0,-.18,.085);g.add(lab);
+    L3.box={pos:new V3(p.x,1.45,p.z-.3),slots}}
+  // the courtyard: a dry fountain in the middle, hedges, benches and dead lamps. It walks straight through all of it.
+  const stoneM=envDetail(new THREE.MeshStandardMaterial({map:T.paving,roughness:.85,color:0xb8b0a0}),'wall');
+  {const ring=add(new THREE.Mesh(new THREE.CylinderGeometry(5.4,5.6,.75,40,1,true),stoneM),true);ring.position.y=.375;const top=add(new THREE.Mesh(new THREE.RingGeometry(4.9,5.5,40).rotateX(-Math.PI/2),stoneM));top.position.y=.75;const basin=add(new THREE.Mesh(new THREE.CircleGeometry(4.9,40).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x2a2620,roughness:.95})));basin.position.y=.02}
+  const hedgeM=new THREE.MeshStandardMaterial({map:T.hedge,roughness:1,color:0x9aa890});const used=[];
+  for(let tries=0;used.length<10&&tries<300;tries++){const x=(rnd()*2-1)*(C-3.5),z=(rnd()*2-1)*(C-3.5),w=rnd()<.5?5:2.4,d=w===5?2:2.4;if(Math.hypot(x,z)<8||used.some(u=>Math.hypot(u[0]-x,u[1]-z)<6))continue;used.push([x,z]);
+    box(x-w/2-.2,0,z-d/2-.2,x+w/2+.2,.8,z+d/2+.2,stoneM);box(x-w/2,.8,z-d/2,x+w/2,2.6,z+d/2,hedgeM)}
+  for(let k=0;k<8;k++){const a=k/8*6.28+.2,x=Math.cos(a)*9,z=Math.sin(a)*9;const p=add(new THREE.Mesh(new THREE.CylinderGeometry(.08,.11,4.2,8),M.metal),true);p.position.set(x,2.1,z);const h=add(new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshStandardMaterial({color:0x2a2a28,roughness:.3})));h.position.set(x,4.3,z)}
+  // the lift you arrive in, set into the south wall of the lobby
+  {const g=new THREE.Group();g.position.z=cOw-34;const cabM=new THREE.MeshStandardMaterial({color:0x54574f,roughness:.5,metalness:.6});
     const back=new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,.1),cabM);back.position.set(0,1.6,37.3);g.add(back);for(const s of[-1,1]){const sw=new THREE.Mesh(new THREE.BoxGeometry(.1,3.2,3.4),cabM);sw.position.set(s*1.6,1.6,35.6);g.add(sw)}
     const top=new THREE.Mesh(new THREE.BoxGeometry(3.2,.1,3.4),cabM);top.position.set(0,3.2,35.6);g.add(top);const fl=new THREE.Mesh(new THREE.BoxGeometry(3.2,.06,3.4),new THREE.MeshStandardMaterial({color:0x2a2a28,roughness:.6,metalness:.5}));fl.position.set(0,.03,35.6);g.add(fl);
     const bulb=new THREE.Mesh(new THREE.SphereGeometry(.09,10,8),new THREE.MeshBasicMaterial({color:0xfff0c0,toneMapped:false}));bulb.position.set(0,3.05,35.8);g.add(bulb);
@@ -2742,144 +2780,177 @@ function buildL3(){
     const gate=new THREE.Mesh(new THREE.PlaneGeometry(3.1,2.9),new THREE.MeshStandardMaterial({map:gateT,transparent:true,alphaTest:.3,side:THREE.DoubleSide,metalness:.6,roughness:.5}));gate.position.set(0,1.45,34.45);gate.rotation.y=Math.PI;g.add(gate);
     const shT=ctex(256,512,(gg,w,h)=>{gg.fillStyle='#3a3934';gg.fillRect(0,0,w,h);for(let i=0;i<6000;i++){gg.fillStyle=`rgba(${rnd()<.5?'20,20,18':'120,118,110'},${rnd()*.15})`;gg.fillRect(rnd()*w,rnd()*h,2,2)}gg.fillStyle='#1c1b18';gg.fillRect(0,h*.45,w,22);gg.fillStyle='#54504a';gg.fillRect(w*.1,0,10,h)});
     const shaft=new THREE.Mesh(new THREE.PlaneGeometry(3.1,3.2),new THREE.MeshBasicMaterial({map:shT,color:0x777777}));shaft.position.set(0,1.6,34.25);shaft.rotation.y=Math.PI;g.add(shaft);
-    g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=true}});levelGroup.add(g);L3.lift={g,doors,gate,shaft,shT,bulb}}
-  // the slam marker and dust
-  L3.marker=new THREE.Mesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:T.marker,transparent:true,depthWrite:false,toneMapped:false}));L3.marker.position.y=.03;L3.marker.visible=false;scene.add(L3.marker);
-  if(!L3.dust){const n=220,g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(n*3),3));L3.dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xb8b0a0,size:.12,transparent:true,opacity:.7,depthWrite:false}));L3.dust.frustumCulled=false;L3.dust.userData.v=new Float32Array(n*3);L3.dust.userData.life=0;scene.add(L3.dust)}L3.dust.visible=false;
+    g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=true}});levelGroup.add(g);L3.lift={g,doors,gate,shaft,shT,bulb,z:cOw}}
+  // glass and dust when it smashes a window
+  if(!L3.dust){const n=200,g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(n*3),3));L3.dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xd8e0e8,size:.07,transparent:true,opacity:.8,depthWrite:false}));L3.dust.frustumCulled=false;L3.dust.userData.v=new Float32Array(n*3);L3.dust.userData.life=0;scene.add(L3.dust)}L3.dust.visible=false;
 }
+function l3Curtain(w,dt){// curtains: k=0 pulled back to the sides, k=1 drawn across
+  if(w.state==='torn')return;const sp=dt?dt/.45:1;w.k+=clamp(w.want-w.k,-sp,sp);const e=w.k*w.k*(3-2*w.k);
+  w.curs.forEach((c,i)=>{const s=i?1:-1;c.scale.x=lerp(.22,1,e);c.position.x=s*lerp(.98,.5,e);c.rotation.y=s*lerp(.25,0,e)})}
 // ---- collision and line of sight
-function l3Collide(p,r){const S=L3.S-.05;
+function l3Collide(p,r){const k=L3.k;
   for(const b of L3.col){const qx=clamp(p.x,b.x0,b.x1),qz=clamp(p.z,b.z0,b.z1),ex=p.x-qx,ez=p.z-qz,d=Math.hypot(ex,ez);if(d>=r)continue;
     if(d<1e-6){const ox=Math.min(p.x-b.x0,b.x1-p.x),oz=Math.min(p.z-b.z0,b.z1-p.z);if(ox<oz)p.x=(p.x-b.x0<b.x1-p.x)?b.x0-r:b.x1+r;else p.z=(p.z-b.z0<b.z1-p.z)?b.z0-r:b.z1+r}else{p.x=qx+ex/d*r;p.z=qz+ez/d*r}}
-  const d=Math.hypot(p.x,p.z),R=7.6+r;if(d<R&&d>1e-4){p.x*=R/d;p.z*=R/d}
-  p.x=clamp(p.x,-S+r,S-r);p.z=clamp(p.z,-S+r,S-r)}
+  // never out into the courtyard, never past the outer walls
+  const m=Math.max(Math.abs(p.x),Math.abs(p.z));if(m<k.cIn+r){const i=l3Wing(p.x,p.z),o=L3OUT[i];if(o[0])p.x=o[0]*(k.cIn+r);else p.z=o[1]*(k.cIn+r)}
+  const lim=k.cOw-r+(p.z>0&&Math.abs(p.x)<1.6?3.2:0);p.x=clamp(p.x,-k.cOw+r,k.cOw-r);p.z=clamp(p.z,-k.cOw+r,lim)}
 function segBox(a,b,B){let t0=0,t1=1;for(const[k,lo,hi]of[['x',B.x0,B.x1],['y',B.y0,B.y1],['z',B.z0,B.z1]]){const d=b[k]-a[k];if(Math.abs(d)<1e-9){if(a[k]<lo||a[k]>hi)return false}else{let u=(lo-a[k])/d,v=(hi-a[k])/d;if(u>v)[u,v]=[v,u];t0=Math.max(t0,u);t1=Math.min(t1,v);if(t0>t1)return false}}return true}
-function l3Blocked(a,b){for(const B of L3.cov)if(segBox(a,b,B))return true;// the fountain rim is low, the building is not in the way from inside
-  return false}
-function l3Covered(x,z){return L3.roofs.find(r=>x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1)||null}
+function l3Blocked(a,b){for(const B of L3.cov)if(segBox(a,b,B))return true;for(const w of L3.win)if(w.state!=='torn'&&w.k>.75&&segBox(a,b,w.cov))return true;return false}
+function l3InRoom(x,z){const i=l3Wing(x,z);return l3UC(i,x,z).c>L3.k.cRw}
 // ---- the giant
+function l3Spot(w,u){const p=l3W(w,u,L3.C+1.7);return new V3(p.x,.35,p.z)}// what it aims at: the corridor floor behind a window
+function l3Stand(w,d,u){const p=l3W(w,(u||0)*.35,L3.C-d);return new V3(p.x,0,p.z)}// where it stands to look into wing w, d metres out from the wall
 function l3GiantPose(dt){if(!CR)return;FIN.gs.scale.setScalar(1);FIN.gs.position.set(0,0,0);FIN.gs.updateMatrixWorld(true);
   INTENT.look.copy(G3.look).multiplyScalar(1/GSC);MON.pos.copy(G3.pos).multiplyScalar(1/GSC);MON.vel.copy(G3.vel).multiplyScalar(1/GSC);MON.speed=MON.vel.length();MON.yaw=G3.yaw;
   if(computePose(dt))CR.apply(POSE);FIN.gs.scale.setScalar(GSC);FIN.gs.updateMatrixWorld(true)}
-function l3Head(){return CR?CR.B.head_05.getWorldPosition(new V3()):new V3(G3.pos.x,17,G3.pos.z)}
-function l3GiantReset(awake){G3.pos.set(0,0,0);G3.vel.set(0,0,0);G3.yaw=Math.PI;G3.state=awake?'search':'scan';G3.t=0;G3.sus=0;G3.lost=0;G3.slam=null;G3.slamCool=2.5;G3.scanA=0;G3.look.set(0,0,20);G3.lookT.copy(G3.look);
-  resetIntent();placeMonster(0,0,Math.PI,1);if(L3.marker)L3.marker.visible=false}
-function l3Noise(x,z){G3.noise=new V3(x,0,z);G3.noiseT=G.time}
+function l3Head(){return CR?CR.B.head_05.getWorldPosition(new V3()):new V3(G3.pos.x,9,G3.pos.z)}
+const L3EYE={f:.6,u:.42,s:.36};
+function l3Eyes(){// the two eyes, from the head bone and the way it's looking
+  const h=l3Head(),d=G3.look.clone().sub(h).normalize();if(!CR)return{c:h,l:h,r:h,d};const ff=CR.B.frontface_07.getWorldPosition(new V3()),F=ff.clone().sub(h).normalize();
+  const s=new V3().crossVectors(F,new V3(0,1,0)).normalize(),up=new V3().crossVectors(s,F).normalize();
+  const c=ff.addScaledVector(F,L3EYE.f).addScaledVector(up,L3EYE.u);return{c,l:c.clone().addScaledVector(s,-L3EYE.s),r:c.clone().addScaledVector(s,L3EYE.s),d:G3.look.clone().sub(c).normalize()}}
+function l3GiantReset(wing,u){G3.wing=wing==null?0:wing;G3.u=u==null?-14:u;G3.udir=G3.u<0?1:-1;G3.pos.copy(l3Stand(G3.wing,21,G3.u));G3.vel.set(0,0,0);
+  G3.yaw=Math.atan2(L3OUT[G3.wing][0],L3OUT[G3.wing][1]);G3.state='sweep';G3.t=0;G3.sus=0;G3.lost=0;G3.slam=null;G3.slamCool=3;G3.pause=0;G3.passes=0;G3.stand=.12;
+  G3.lookT.copy(l3Spot(G3.wing,G3.u));G3.look.copy(G3.lookT);resetIntent();placeMonster(G3.pos.x/GSC,G3.pos.z/GSC,G3.yaw,.5)}
 function l3Roar(){if(!AC)return;SND.scream();[55,58,82].forEach(f=>tone(monBus,{f,f2:f*.6,type:'sawtooth',v:.3,d:2,a:.1,bp:300,q:2}));hiss(monBus,{ft:'lowpass',f:400,v:.8,d:1.8,a:.2});G.shake=Math.max(G.shake,1)}
-function l3Slam(target){const t=target.clone();const d=Math.hypot(t.x-G3.pos.x,t.z-G3.pos.z),max=11.5;if(d>max){t.x=G3.pos.x+(t.x-G3.pos.x)*max/d;t.z=G3.pos.z+(t.z-G3.pos.z)*max/d}
-  const lf=leftOf(G3.yaw),rel=(t.x-G3.pos.x)*lf.x+(t.z-G3.pos.z)*lf.z;G3.slam={t:0,ph:'wind',tgt:t,h:rel>0?0:1,roof:l3Covered(t.x,t.z)};
-  L3.marker.visible=true;L3.marker.position.set(t.x,.04,t.z);L3.marker.scale.setScalar(.1);
+function l3Smash(w){// rear up, then come down with both hands through a window
+  const o=L3OUT[w.i];G3.slam={t:0,ph:'wind',w,tgt:w.inner.clone(),o};
   if(AC){tone(monBus,{f:70,f2:120,type:'sawtooth',v:.12,d:.9,a:.4,bp:240,q:3});hiss(master,{f:1800,f2:500,q:1,v:.08,d:.9,a:.5})}}
-function l3Impact(){const s=G3.slam,t=s.tgt;G.shake=Math.max(G.shake,clamp(1.6-Math.hypot(t.x-player.x,t.z-player.z)/14,.2,1.6));
-  if(AC){hiss(master,{ft:'lowpass',f:200,v:1,d:1});tone(master,{f:42,f2:24,v:.7,d:.8});if(s.roof)hiss(master,{f:2400,q:.7,v:.25,d:1.2,a:.05})}
-  const D=L3.dust,P=D.geometry.attributes.position,V=D.userData.v;for(let i=0;i<P.count;i++){const a=rnd()*6.28,sp=2+rnd()*6;P.setXYZ(i,t.x,s.roof?s.roof.y+.4:.2,t.z);V[i*3]=Math.cos(a)*sp;V[i*3+1]=1+rnd()*4;V[i*3+2]=Math.sin(a)*sp}P.needsUpdate=true;D.visible=true;D.userData.life=2.2;
-  const pd=Math.hypot(t.x-player.x,t.z-player.z);
-  if(!s.roof&&pd<3.4&&!l3Covered(player.x,player.z)&&G.state==='play'){beginL3Kill();return}
-  if(pd<7&&G.state==='play'){G.stunT=.45;G.glitch=1;caption(pick(['[The ground jumps under you.]','[Too close.]','[Its hand hits the stone right beside you.]']))}}
+function l3Glass(){if(!AC)return;for(let k=0;k<5;k++)setTimeout(()=>{if(AC)hiss(master,{f:3500+rnd()*3000,q:1.5,v:.25,d:.25+rnd()*.3})},k*45+rnd()*30);[2400,3100,4200].forEach(f=>tone(master,{f,f2:f*.7,type:'triangle',v:.05,d:.6}))}
+function l3Impact(){const s=G3.slam,w=s.w,t=s.tgt;const pd=Math.hypot(t.x-player.x,t.z-player.z);G.shake=Math.max(G.shake,clamp(1.6-pd/10,.3,1.6));
+  if(AC){hiss(master,{ft:'lowpass',f:220,v:1,d:1});tone(master,{f:42,f2:24,v:.7,d:.8})}l3Glass();
+  if(w.state!=='torn'){w.state='torn';w.curs.forEach(c=>{c.visible=false})}
+  const D=L3.dust,P=D.geometry.attributes.position,V=D.userData.v;for(let i=0;i<P.count;i++){P.setXYZ(i,w.pos.x+(rnd()-.5)*1.6,1+rnd()*1.5,w.pos.z+(rnd()-.5)*1.6);const sp=2+rnd()*5;V[i*3]=-w.n.x*sp+(rnd()-.5)*3;V[i*3+1]=rnd()*3;V[i*3+2]=(-w.n.z)*sp+(rnd()-.5)*3}P.needsUpdate=true;D.visible=true;D.userData.life=2;
+  if(G.state!=='play')return;
+  if(pd<(L3.awake?3.4:3)&&!l3InRoom(player.x,player.z)){beginL3Kill();return}
+  if(pd<7){G.stunT=.45;G.glitch=1;caption(pick(['[Glass everywhere. Its fingers are in the corridor.]','[Too close.]','[The whole wall shakes.]']))}}
 function updateL3(dt){
-  const I=INTENT;resetIntent();I.noDrag=true;I.limp=false;I.stand=1;I.hunch=.3;I.jaw=.3;I.tilt=Math.sin(G.time*.4)*.35;
-  G3.t+=dt;G3.slamCool-=dt;const head=l3Head();const eye=new V3(player.x,player.y,player.z);const dP=Math.hypot(player.x-G3.pos.x,player.z-G3.pos.z);
-  const los=!l3Blocked(head,eye)&&!l3Blocked(head,new V3(player.x,.4,player.z));
-  const toP=eye.clone().sub(head).normalize(),bd=G3.look.clone().sub(head).normalize(),ang=Math.acos(clamp(toP.dot(bd),-1,1));
-  const inBeam=los&&ang<(L3.awake?.3:.22);
-  // what it is doing
-  let goal=null,walk=0;
-  if(G3.state==='scan'||G3.state==='return'){
-    if(G3.state==='return'){goal=new V3(0,0,0);walk=4;if(G3.pos.length()<1)G3.state='scan'}
-    G3.scanA+=dt*.2*G3.scanDir;if(rnd()<dt*.04)G3.scanDir*=-1;const r=17+8*Math.sin(G3.t*.31);
-    if(G.time-G3.noiseT<5&&G3.noise){G3.lookT.copy(G3.noise).add(new V3(Math.sin(G3.t*1.7)*3,0,Math.cos(G3.t*1.3)*3))}else G3.lookT.set(Math.sin(G3.scanA)*r,0,Math.cos(G3.scanA)*r);
-    const rate=(player.run?2.4:G.crouch?.8:1.5)*(G.light?1.25:1)*(L3.awake?2:1)*clamp(1.3-dP/80,.5,1.3);
-    if(G3.graceT>0){G3.graceT-=dt;G3.sus=0}else if(inBeam||(dP<9&&G.noise>4))G3.sus=Math.min(1.2,G3.sus+dt*rate);else G3.sus=Math.max(0,G3.sus-dt*.35);
-    if(G3.sus>=1){G3.state='roar';G3.t=0;l3Roar();G3.last=eye.clone();caption(pick(['[It sees you.]','[The light stops on you.]','[It has found you.]']))}}
-  else if(G3.state==='roar'){G3.lookT.copy(eye);I.jaw=1;I.armsUp=.8;I.tilt=Math.sin(G3.t*30)*.25;I.hunch=0;if(G3.t>1.2){G3.state='hunt';G3.t=0;G3.lost=0}}
-  else if(G3.state==='hunt'||G3.state==='search'){
-    if(los){G3.last=eye.clone();G3.lost=0;G3.lookT.copy(eye)}else{G3.lost+=dt;if(G3.last)G3.lookT.copy(G3.last).add(new V3(Math.sin(G3.t*1.5)*4,0,Math.cos(G3.t*1.1)*4))}
-    if(L3.awake&&G.time-G3.noiseT<2&&G3.noise&&!los)G3.last=G3.noise.clone();
-    I.jaw=.7;I.hunch=.15;
-    if(G3.last){const d=Math.hypot(G3.last.x-G3.pos.x,G3.last.z-G3.pos.z);if(d>10&&!G3.slam){goal=G3.last;walk=L3.awake?8:6.5}}
-    if(los&&!G3.slam&&G3.slamCool<=0&&dP<14){const lead=new V3(player.vx||0,0,player.vz||0).multiplyScalar(.45);l3Slam(new V3(player.x,0,player.z).add(lead))}
-    if(G3.state==='hunt'&&G3.lost>(L3.awake?6:3)){G3.state='search';G3.t=0}
-    if(G3.state==='search'){if(los&&inBeam){G3.state='hunt';G3.t=0}else if(G3.t>(L3.awake?14:6)){G3.state=L3.awake?'search':'return';G3.t=0;G3.sus=.3;if(L3.awake){G3.last=new V3(player.x+(rnd()-.5)*10,0,player.z+(rnd()-.5)*10)}}}}
-  // the slam itself: wind up high over the target, then down
-  if(G3.slam){const s=G3.slam;s.t+=dt;const t=s.tgt,wind=L3.awake?.8:.95;walk=0;goal=null;
-    const dx=t.x-G3.pos.x,dz=t.z-G3.pos.z,dd=Math.hypot(dx,dz)||1,ux=dx/dd,uz=dz/dd,lx=-uz,lz=ux;
-    const hands=[0,1].map(h=>{const sg=h?-1:1;return{up:new V3(G3.pos.x+ux*2+lx*sg*3.5,23,G3.pos.z+uz*2+lz*sg*3.5),down:new V3(t.x+lx*sg*1.6,s.roof?s.roof.y+.45:.3,t.z+lz*sg*1.6)}});
-    let k=0;
-    if(s.ph==='wind'){// rears up, both arms over its head
-      I.stand=1;I.hunch=0;I.leanF=-.1;I.jaw=1;I.tilt=Math.sin(s.t*20)*.15;L3.marker.scale.setScalar(lerp(1,8,clamp(s.t/wind,0,1)));if(s.t>wind){s.ph='down';s.t=0;s.from=G3.pos.clone()}}
-    else if(s.ph==='down'){// drops onto all fours and pounces, hands first
-      k=clamp(s.t/.32,0,1);I.stand=0;I.jaw=1;I.hunch=0;const land=new V3(t.x-ux*7.5,0,t.z-uz*7.5);G3.pos.copy(s.from).lerp(land,k*k);if(k>=1){s.ph='hold';s.t=0}}
-    else{k=1;I.stand=0;I.jaw=.8;I.hunch=0;if(!s.hit&&CR){const hy=Math.min(CR.B.HandL_011.getWorldPosition(_e).y,CR.B.HandR_024.getWorldPosition(_e).y);if(hy<(s.roof?s.roof.y+2:2.5)||s.t>.3){s.hit=1;L3.marker.visible=false;l3Impact()}}if(s.t>1){G3.slam=null;G3.slamCool=L3.awake?1.1:1.7}}
-    if(G3.slam)hands.forEach((H,h)=>{const e=s.ph==='wind'?0:k*k;I.grip[h]=H.up.clone().lerp(H.down,e).multiplyScalar(1/GSC);I.gripDir[h]=new V3(ux,-1,uz).normalize();I.curl[h]=s.ph==='wind'?.15:.85});
+  const I=INTENT;resetIntent();I.noDrag=true;I.limp=false;I.hunch=.5;I.leanF=.3;I.jaw=.35;I.tilt=Math.sin(G.time*.5)*.3;
+  G3.t+=dt;G3.slamCool-=dt;if(G3.graceT>0)G3.graceT-=dt;const k=L3.k;
+  const E=l3Eyes(),head=E.c;const body=new V3(player.x,G.crouch?.75:1.15,player.z),eye=new V3(player.x,player.y,player.z);
+  const pw=l3Wing(player.x,player.z),pu=l3UC(pw,player.x,player.z).u;
+  const bd=G3.look.clone().sub(head).normalize(),cone=Math.cos(L3.light.angle*.9);let vis=false,inBeam=false;
+  for(const pt of[new V3(player.x,.45,player.z),body,eye]){if(l3Blocked(head,pt))continue;vis=true;if(pt.clone().sub(head).normalize().dot(bd)>cone)inBeam=true}L3.lit=inBeam;
+  // it hears you run
+  G3.hearT-=dt;if(G3.hearT<=0){G3.hearT=.5;if(player.run&&G.noise>10&&rnd()<(L3.awake?.6:.28)){G3.noise=new V3(player.x,0,player.z);G3.noiseT=G.time;G3.noiseW=pw;
+    if(G3.state==='sweep'){const nu=pu+(rnd()-.5)*(L3.awake?4:9);if(G3.wing!==pw)G3.passes=0;G3.wing=pw;G3.udir=Math.sign(nu-G3.u)||1;G3.u=clamp(G3.u,-k.cIn,k.cIn);G3.pause=0;G3.sus=Math.min(.6,G3.sus+.12);if(rnd()<.35)caption(pick(['[It heard that.]','[The light swings your way.]','[Its head turns toward the noise.]']))}}}
+  let goal=null,walk=0,want=.12;
+  if(G3.state==='sweep'){// drag the beam along one wing's windows, back and forth, pausing to peer in
+    const spd=L3.awake?4.2:2.3;
+    if(G3.pause>0){G3.pause-=dt;want=.02;I.tilt=Math.sin(G3.t*.9)*.5;I.leanF=.45}
+    else{G3.u+=G3.udir*spd*dt;if(Math.abs(G3.u)>k.cIn){G3.u=Math.sign(G3.u)*k.cIn;G3.udir*=-1;G3.passes++}
+      const wu=Math.round((G3.u+20)/4)*4-20;if(Math.abs(G3.u-wu)<.15&&rnd()<(L3.awake?.12:.3)&&G3.lastPause!==wu){G3.pause=1+rnd()*1.6;G3.lastPause=wu}}
+    // switch wings now and then: toward you more often than not
+    if(G3.passes>=2||(G3.t>26&&!L3.awake)||(L3.awake&&G3.t>12)){const nw=rnd()<(L3.awake?.75:.5)?pw:pick([0,1,2,3].filter(x=>x!==G3.wing));if(nw!==G3.wing){G3.wing=nw;G3.u=(rnd()<.5?-1:1)*k.cIn*.8;G3.udir=-Math.sign(G3.u)}G3.passes=0;G3.t=0}
+    G3.lookT.copy(l3Spot(G3.wing,G3.u));goal=l3Stand(G3.wing,L3.awake?19:21,G3.u);walk=L3.awake?5:3.2;want=G3.pause>0?.02:(L3.awake?.08:.12);
+    const rate=.85*(G.crouch?.6:1)*(G.light?1.3:1)*(L3.awake?1.8:1)*(L3.power?1.2:1);
+    if(G3.graceT>0)G3.sus=0;else if(inBeam)G3.sus=Math.min(1.2,G3.sus+dt*rate);else G3.sus=Math.max(0,G3.sus-dt*.4);
+    if(G3.sus>=1){G3.state='roar';G3.t=0;l3Roar();G3.last=body.clone();G3.lastW=pw;G3.lastU=pu;caption(pick(['[It sees you.]','[The light stops on you.]','[It has found you.]']))}}
+  else if(G3.state==='roar'){G3.lookT.copy(body);I.jaw=1;I.armsUp=.6;I.tilt=Math.sin(G3.t*30)*.25;I.hunch=.1;want=.75;if(G3.t>(L3.awake?.7:1.1)){G3.state='hunt';G3.t=0;G3.lost=0}}
+  else if(G3.state==='hunt'||G3.state==='search'){I.jaw=.75;I.hunch=.25;want=G3.state==='hunt'?.22:.12;
+    if(vis&&(G3.state==='hunt'||inBeam)){G3.last=body.clone();G3.lastW=pw;G3.lastU=pu;G3.lost=0;G3.lookT.copy(body);if(G3.state==='search'){G3.state='hunt';G3.t=0;SND.sting()}}
+    else{G3.lost+=dt;const su=G3.lastU+Math.sin(G3.t*(G3.state==='search'?1.1:2))*(G3.state==='search'?6:2.5);G3.lookT.copy(l3Spot(G3.lastW,su))}
+    goal=l3Stand(G3.lastW,L3.awake?15:17,G3.lastU);walk=L3.awake?7:5.5;
+    if(!G3.slam&&G3.slamCool<=0){// reach for the window nearest to where you are (or are about to be)
+      const lead=new V3(player.vx||0,0,player.vz||0).multiplyScalar(L3.awake?.9:.6);const tp=vis?body.clone().add(lead):G3.last;
+      let best=null,bd2=vis?5.5:4;for(const w of L3.win){if(w.i!==(vis?pw:G3.lastW))continue;const d=Math.hypot(w.inner.x-tp.x,w.inner.z-tp.z);if(d<bd2){bd2=d;best=w}}
+      if(best&&(vis||(G3.lost>.6&&G3.lost<3&&!G3.smashedLast))){l3Smash(best);if(!vis)G3.smashedLast=true}}
+    if(vis)G3.smashedLast=false;
+    if(G3.state==='hunt'&&G3.lost>(L3.awake?4:2.5)){G3.state='search';G3.t=0}
+    if(G3.state==='search'&&G3.t>(L3.awake?12:7)){G3.state='sweep';G3.t=0;G3.sus=.25;G3.wing=G3.lastW;G3.u=G3.lastU;G3.udir=rnd()<.5?1:-1;G3.passes=0}}
+  // the smash: rear up, drop onto its hands at the wall, punch through the window
+  if(G3.slam){const s=G3.slam,t=s.tgt;s.t+=dt;walk=0;goal=null;const wind=L3.awake?.65:.85;const o=s.o,al=new V3(-o[1],0,o[0]);
+    let kk=0;
+    if(s.ph==='wind'){want=1;I.hunch=0;I.leanF=-.1;I.jaw=1;I.tilt=Math.sin(s.t*20)*.15;if(s.w.state!=='torn')s.w.curs.forEach((c,i)=>c.rotation.y+=Math.sin(G.time*40+i)*.02);if(s.t>wind){s.ph='down';s.t=0;s.from=G3.pos.clone()}}
+    else if(s.ph==='down'){kk=clamp(s.t/.32,0,1);want=0;I.jaw=1;I.hunch=0;const lp=l3W(s.w.i,s.w.u,L3.C-7.4);G3.pos.copy(s.from).lerp(new V3(lp.x,0,lp.z),kk*kk);if(kk>=1){s.ph='hold';s.t=0}}
+    else{kk=1;want=0;I.jaw=.8;I.hunch=0;if(!s.hit&&CR){const hy=Math.min(CR.B.HandL_011.getWorldPosition(_e).y,CR.B.HandR_024.getWorldPosition(_e).y);if(hy<3||s.t>.28){s.hit=1;l3Impact()}}if(s.t>1.1){G3.slam=null;G3.slamCool=L3.awake?1.3:2.2}}
+    if(G3.slam)[0,1].forEach(h=>{const sg=h?-1:1;const up=new V3(G3.pos.x-o[0]*0+al.x*sg*3.5,21,G3.pos.z+al.z*sg*3.5);const dn=new V3(t.x+al.x*sg*.55,1.2,t.z+al.z*sg*.55);const e=s.ph==='wind'?0:kk*kk;
+      I.grip[h]=up.lerp(dn,e).multiplyScalar(1/GSC);I.gripDir[h]=new V3(o[0],-.6,o[1]).normalize();I.curl[h]=s.ph==='wind'?.15:.85});
     G3.lookT.copy(t)}
-  // walking: it steps toward its goal, but never leaves the middle of the courtyard
-  const lim=24;if(goal){const dx=goal.x-G3.pos.x,dz=goal.z-G3.pos.z,d=Math.hypot(dx,dz)||1;const k=1-Math.exp(-dt*2);G3.vel.x+=(dx/d*walk-G3.vel.x)*k;G3.vel.z+=(dz/d*walk-G3.vel.z)*k}else G3.vel.multiplyScalar(Math.exp(-dt*4));
-  G3.pos.addScaledVector(G3.vel,dt);G3.pos.x=clamp(G3.pos.x,-lim,lim);G3.pos.z=clamp(G3.pos.z,-lim,lim);
-  // body turns toward where it's looking (with steps), the head and the light follow faster
-  const want=Math.atan2(G3.lookT.x-G3.pos.x,G3.lookT.z-G3.pos.z);const dy=angDiff(G3.yaw,want);if(Math.abs(dy)>.5||G3.vel.length()>.5||G3.slam)G3.yaw+=clamp(dy,-1.1*dt,1.1*dt);
-  G3.look.lerp(G3.lookT,1-Math.exp(-dt*(G3.state==='hunt'||G3.slam?4:1.6)));
+  G3.stand=damp(G3.stand,want,G3.slam?8:2.5,dt);I.stand=G3.stand;
+  // walking: it steps toward its goal, never right up against the building
+  const lim=L3.C-6.5;if(goal){const dx=goal.x-G3.pos.x,dz=goal.z-G3.pos.z,d=Math.hypot(dx,dz);const sp=d>1.5?walk:0;const kk=1-Math.exp(-dt*2);G3.vel.x+=((d>1e-3?dx/d:0)*sp-G3.vel.x)*kk;G3.vel.z+=((d>1e-3?dz/d:0)*sp-G3.vel.z)*kk}else G3.vel.multiplyScalar(Math.exp(-dt*4));
+  G3.pos.addScaledVector(G3.vel,dt);if(!G3.slam){G3.pos.x=clamp(G3.pos.x,-lim,lim);G3.pos.z=clamp(G3.pos.z,-lim,lim)}
+  const wy=Math.atan2(G3.lookT.x-G3.pos.x,G3.lookT.z-G3.pos.z);const dy=angDiff(G3.yaw,wy);if(Math.abs(dy)>.35||G3.vel.length()>.5||G3.slam)G3.yaw+=clamp(dy,-1.2*dt,1.2*dt);
+  G3.look.lerp(G3.lookT,1-Math.exp(-dt*(G3.state==='hunt'||G3.state==='roar'||G3.slam?5:2.2)));
   l3GiantPose(dt);l3Beam(dt);
-  if(AC&&CR){const h=l3Head();setPos(monPan,h.x,h.y,h.z);tensG.gain.setTargetAtTime(G3.state==='scan'?.25+G3.sus*.6:.9,AC.currentTime,.3);breathG.gain.setTargetAtTime(.2,AC.currentTime,.3)}
-  G.heartT-=dt;if(G.heartT<=0&&(G3.sus>.3||G3.state==='hunt')){G.heartT=lerp(.35,.9,1-G3.sus);SND.heart(.08+G3.sus*.25)}
-  if(G3.sus>.45&&G3.state==='scan'&&!G3.warned){G3.warned=true;SND.sting()}if(G3.sus<.1)G3.warned=false}
-function l3Beam(dt){if(!L3.light||!CR)return;const h=l3Head();const L=L3.light;L.position.copy(h);L.target.position.copy(G3.look);L.target.updateMatrixWorld();
-  const k=G3.state==='scan'||G3.state==='return'?G3.sus:1;const c=new THREE.Color(0xdfe6ff).lerp(new THREE.Color(0xff5a3a),clamp(k,0,1));L.color.copy(c);L.intensity=G.state==='killcam'?0:(G3.state==='roar'?260:170)*(rnd()<.006?.3:1);L.angle=L3.awake?.29:.21;
-  const B=L3.beam;B.visible=G.state!=='killcam';B.position.copy(h);B.lookAt(G3.look);const len=h.distanceTo(G3.look)+2;const r=len*Math.tan(L.angle*.9);B.scale.set(r,r,len);B.material.uniforms.uC.value.copy(c);const ca=camera.position.clone().sub(h).normalize().dot(G3.look.clone().sub(h).normalize());B.material.uniforms.uA.value=(G3.state==='roar'?.2:.11)*(ca>Math.cos(L.angle)?.18:1)}
-function l3Step(i){if(!AC)return;const d=Math.hypot(player.x-G3.pos.x,player.z-G3.pos.z),k=clamp(1.3-d/40,.2,1);tone(master,{f:44,f2:26,v:.45*k,d:.5});hiss(master,{ft:'lowpass',f:140,v:.5*k,d:.35});G.shake=Math.max(G.shake,.35*k)}
-// ---- its kill: the hand comes down on you, then its face
+  if(AC&&CR){const h=l3Head();setPos(monPan,h.x,h.y,h.z);tensG.gain.setTargetAtTime(G3.state==='sweep'?.2+G3.sus*.6:.9,AC.currentTime,.3);breathG.gain.setTargetAtTime(.2,AC.currentTime,.3)}
+  G.heartT-=dt;if(G.heartT<=0&&(G3.sus>.25||G3.state==='hunt')){G.heartT=lerp(.35,.9,1-G3.sus);SND.heart(.08+G3.sus*.25)}
+  if(G3.sus>.4&&G3.state==='sweep'&&!G3.warned){G3.warned=true;SND.sting()}if(G3.sus<.1)G3.warned=false}
+function l3Beam(dt){if(!L3.light||!CR)return;const E=l3Eyes();const L=L3.light;L.position.copy(E.c);L.target.position.copy(G3.look);L.target.updateMatrixWorld();
+  const k=G3.state==='sweep'?G3.sus:1;const c=new THREE.Color(0xf2f5ff).lerp(new THREE.Color(0xffe6dc),clamp(k,0,1)*.5);L.color.copy(c);const kc=G.state==='killcam';
+  L.intensity=kc?0:(G3.state==='roar'?600:440)*(rnd()<.006?.3:1)*(L3.awake?1.15:1);L.angle=G3.state==='hunt'||G3.state==='roar'?.2:.16;
+  // the visible cone stops where it goes in through the wall
+  const B=L3.beam;B.visible=!kc;B.position.copy(E.c);B.lookAt(G3.look);const w=l3Wing(G3.look.x,G3.look.z),o=L3OUT[w];const hc=E.c.x*o[0]+E.c.z*o[1],tc=G3.look.x*o[0]+G3.look.z*o[1];
+  const full=E.c.distanceTo(G3.look),frac=tc-hc>.5?clamp((L3.C-hc)/(tc-hc),.2,1):1;const len=full*frac;const r=len*Math.tan(L.angle*.85);B.scale.set(r,r,len);B.material.uniforms.uC.value.copy(c);
+  const ca=camera.position.clone().sub(E.c).normalize().dot(E.d);B.material.uniforms.uA.value=(G3.state==='roar'?.09:.055)*(ca>Math.cos(L.angle)?.1:1);
+  // the eyes themselves
+  L3.eyes.visible=!kc&&L3.on&&!l3Blocked(camera.position,E.c);const fl=.85+Math.sin(G.time*13)*.05+(rnd()<.02?-.3:0);
+  // when the beam is on the camera, the eyes flare and fill the window
+  const cg=camera.position.clone().sub(E.c).normalize().dot(E.d),cl=Math.cos(L.angle*2.2),ch=Math.cos(L.angle*.5);let gl=clamp((cg-cl)/(ch-cl),0,1);gl=gl*gl*(3-2*gl);if(gl>0&&L3.on&&l3Blocked(E.c,camera.position))gl=0;L3.glare=damp(L3.glare||0,gl,8,dt||1/30);
+  [E.l,E.r].forEach((p,i)=>L3.eyeS[i].forEach((sp,j)=>{sp.position.copy(p);sp.material.opacity=(j?1:.45+L3.glare*.3)*fl;sp.scale.setScalar(j?.55+L3.glare*.2:1.6+L3.glare*1)}));
+  // the light off its own eyes, on its face and hands
+  L3.faceL.position.copy(E.c).addScaledVector(E.d,2.2);L3.faceL.intensity=kc?0:(G3.state==='roar'?16:10)*fl}
+function l3Step(i){if(!AC)return;const d=Math.hypot(player.x-G3.pos.x,player.z-G3.pos.z),k=clamp(1.3-d/40,.2,1);tone(master,{f:44,f2:26,v:.45*k,d:.5});hiss(master,{ft:'lowpass',f:140,v:.5*k,d:.35});G.shake=Math.max(G.shake,.3*k)}
+// ---- its kill: the hand comes through the window, then its face
 function beginL3Kill(){if(G.state!=='play')return;G.state='dying';G.scareT=0;VM.reach=null;L3.deaths++;
   K.yaw0=player.yaw;K.pitch0=player.pitch;K.y0=player.y;K.x=player.x;K.z=player.z;K.side=rnd()<.5?1:-1;K.snd=0;K.cam={x:K.x,y:K.y0,z:K.z,yaw:K.yaw0,pitch:K.pitch0,roll:0};K.dist=1}
 function updateL3Grab(dt){const t=G.scareT,e=(a,b)=>clamp((t-a)/(b-a),0,1),sm=x=>x*x*(3-2*x);const I=INTENT;resetIntent();I.stand=0;I.noDrag=true;I.limp=false;I.jaw=1;I.hunch=0;I.leanF=.2;I.choppy=t>.9;I.tilt=t>.9?Math.sin(t*28)*.4:0;
-  const cam=new V3(K.x,.3,K.z);G3.lookT.copy(cam);G3.look.lerp(cam,1-Math.exp(-dt*4));G3.vel.set(0,0,0);if(G3.slam){const s=G3.slam;[0,1].forEach(h=>{I.grip[h]=new V3(K.x+(h?-1.6:1.6),.4,K.z+.8).multiplyScalar(1/GSC);I.curl[h]=.9})}
+  const cam=new V3(K.x,.6,K.z);G3.lookT.copy(cam);G3.look.lerp(cam,1-Math.exp(-dt*4));G3.vel.set(0,0,0);if(G3.slam){const s=G3.slam;[0,1].forEach(h=>{const al=new V3(-s.o[1],0,s.o[0]);I.grip[h]=new V3(K.x+al.x*(h?-1:1)*.7,.5,K.z+al.z*(h?-1:1)*.7).multiplyScalar(1/GSC);I.curl[h]=.9})}
   l3GiantPose(dt);l3Beam(dt);
-  const head=l3Head();const y=lerp(K.y0,.22,sm(e(0,.25)));const ty=Math.atan2(-(head.x-K.x),-(head.z-K.z)),tp=Math.atan2(head.y-y,Math.max(.5,Math.hypot(head.x-K.x,head.z-K.z)));const k=sm(e(.15,.9));
+  const head=l3Head();const y=lerp(K.y0,.25,sm(e(0,.25)));const ty=Math.atan2(-(head.x-K.x),-(head.z-K.z)),tp=Math.atan2(head.y-y,Math.max(.5,Math.hypot(head.x-K.x,head.z-K.z)));const k=sm(e(.15,.9));
   K.cam={x:K.x,y,z:K.z,yaw:K.yaw0+angDiff(K.yaw0,ty)*k,pitch:lerp(K.pitch0,tp,k),roll:K.side*lerp(0,.9,sm(e(0,.3)))};
   G.killLight=t<1.2?rnd()<.85:false;if(K.snd===0){K.snd=1;hiss(master,{ft:'lowpass',f:200,v:1,d:.8});tone(master,{f:40,f2:22,v:.8,d:.9})}if(t>.8&&K.snd===1){K.snd=2;l3Roar();SND.jump()}
   G.shake=t<.3?1.6:.5;G.glitch=t<.3?1:.6}
-function l3Death(){show(`<div class="tape lost"><div class="label"><div class="top"><span>TRACKING</span><span>CURTAINS ${L3.pulls}</span></div>
-  <h2>IT REACHED DOWN</h2><p>The tape shows the stone, a hand the size of a car, and then the sky full of windows, every one of them with someone in it, watching.</p>
-  <p style="color:#8f8b78">Stay out of its light. Deep under the arcade roof, behind the hedges and under the gazebos it can't see you. When the red ring appears, keep moving: it lands where you were going to be.</p></div>
-  <div class="actions"><span class="fine">NO TAPE LOST · THE CURTAINS STAY OPEN</span><button type="button" data-go id="goRetry">◀◀ REWIND</button></div></div>`);$('goRetry').onclick=()=>l3Retry()}
-function l3Retry(){player.x=0;player.z=31.6;player.yaw=0;player.pitch=0;player.px=undefined;G.crouch=false;G.light=true;G.batt=Math.max(G.batt,60);if(CR)CR.root.visible=true;l3GiantReset(false);G3.state='scan';G3.graceT=7;G3.slamCool=5;G3.last=null;G3.scanA=Math.PI;startPlay();caption('[You wake up under the arcade, by the lift. It is still out there.]')}
-// ---- windows and the people in them
-function l3Windows(dt,cp,cf){let prompt='';const T=L3TEX;
-  for(const w of L3.win){if(w.state==='opening'){w.t+=dt;const k=clamp(w.t/(w===L3.exitWin?.35:.7),0,1),e=k*k*(3-2*k);w.curs.forEach((c,i)=>{const s=i?1:-1;c.scale.x=lerp(1,.22,e);c.position.x=s*lerp(.44,.82,e)});if(k>=1)w.state='open'}
-    if(w.view==='figure'){w.ft+=dt;w.vw.material.map=T.views.figure[(w.ft*1.6|0)%2]}
-    const d=Math.hypot(w.pos.x-player.x,w.pos.z-player.z);if(d>1.7)continue;const v=w.pos.clone().sub(cp).normalize();if(v.dot(cf)<.45)continue;
-    if(w===L3.exitWin&&w.state!=='closed')prompt='<kbd>E</kbd>CLIMB THROUGH';else if(w.state==='closed')prompt='<kbd>E</kbd>PULL THE CURTAINS';else continue;
-    if(ePress&&!VM.reach&&!w.reaching){ePress=false;if(w===L3.exitWin&&w.state!=='closed'){l3ClimbOut(w);return''}w.reaching=true;const ww=w;vmReach(w.pos.clone().addScaledVector(w.n,-.45).setY(1.7),ph=>{if(ph==='grab'&&ww.state==='closed')l3Pull(ww)},'note')}}
-  // peripherals: there when you aren't looking straight at them
-  for(const p of L3.peri){const v=p.mesh.position.clone().sub(cp).normalize();const look=v.dot(cf);const want=look<.82?1:0;p.a+=(want-p.a)*(1-Math.exp(-dt*(want?1.5:14)));p.mesh.material.opacity=p.a;p.mesh.visible=p.a>.02}
+function l3Death(){show(`<div class="tape lost"><div class="label"><div class="top"><span>TRACKING</span><span>FUSES ${L3.got}/4</span></div>
+  <h2>IT REACHED IN</h2><p>The tape shows the window coming apart, a hand the size of a car filling the corridor, and then one white eye, very close, looking in at you.</p>
+  <p style="color:#8f8b78">Stay out of its beam. Duck into the rooms, close the curtains ahead of the light, and when it rears up, keep running: it reaches for the window you're heading for.</p></div>
+  <div class="actions"><span class="fine">NO TAPE LOST · YOU KEEP YOUR FUSES</span><button type="button" data-go id="goRetry">◀◀ REWIND</button></div></div>`);$('goRetry').onclick=()=>l3Retry()}
+function l3Spawn(){const k=L3.k;player.x=0;player.z=k.cRm+1.4;player.yaw=0;player.pitch=0;player.px=undefined;G.crouch=false;player.y=EYE}
+function l3Retry(){l3Spawn();G.light=true;G.batt=Math.max(G.batt,60);if(CR)CR.root.visible=true;l3GiantReset(pick([0,2,3]));G3.graceT=6;G3.slamCool=5;G3.last=null;startPlay();caption('[You wake up in the lift lobby. Its light is somewhere else, for now.]')}
+// ---- curtains, fuses, the fuse box, the stair door
+function l3Interact(dt,cp,cf){let prompt='';const look=(p,lim)=>p.clone().sub(cp).normalize().dot(cf)>lim;
+  for(const w of L3.win)l3Curtain(w,dt);
+  let best=null,bd=1.6;for(const w of L3.win){if(w.state==='torn')continue;const d=Math.hypot(w.hand.x-player.x,w.hand.z-player.z);if(d<bd&&look(w.pos,.3)){bd=d;best=w}}
+  if(best){prompt=best.want?'<kbd>E</kbd>OPEN THE CURTAINS':'<kbd>E</kbd>CLOSE THE CURTAINS';
+    if(ePress&&!VM.reach){ePress=false;const w=best;vmReach(w.hand.clone(),ph=>{if(ph==='grab'&&w.state!=='torn'){w.want=w.want?0:1;if(AC){hiss(master,{f:2600,f2:900,q:.7,v:.14,d:.5,a:.05});tone(master,{f:600,f2:560,type:'square',v:.015,d:.25,bp:900,q:10})}}},'note')}}
+  for(const f of L3.fuses){if(f.taken)continue;f.gs.material.opacity=.35+.3*Math.sin(G.time*3+f.i);const d=Math.hypot(f.pos.x-player.x,f.pos.z-player.z);
+    if(d<1.5&&look(f.pos,.45)){prompt='<kbd>E</kbd>TAKE THE FUSE';if(ePress&&!VM.reach&&!f.reaching){ePress=false;f.reaching=true;const ff=f;vmReach(f.pos.clone(),ph=>{if(ph==='grab'){ff.taken=true;levelGroup.remove(ff.g);L3.got++;hiss(master,{f:2200,q:2,v:.08,d:.15})}else{SND.click2();caption(L3.got<4?`[A fuse. ${4-L3.got} more: one in each wing.]`:'[That\'s all four. Back to the fuse box by the lift.]')}},'battery')}}}
+  const B=L3.box;if(B&&!L3.power&&Math.hypot(B.pos.x-player.x,B.pos.z-player.z)<1.7&&look(B.pos,.3)){
+    if(L3.got>L3.ins){prompt='<kbd>E</kbd>PUT THE FUSES IN';if(ePress&&!VM.reach){ePress=false;vmReach(B.pos.clone().setZ(B.pos.z+.25),ph=>{if(ph==='grab'){L3.ins=L3.got;B.slots.forEach((s,k)=>s.material.color.setHex(k<L3.ins?0x30ff60:0x401008));SND.click2();if(AC)tone(master,{f:220,type:'square',v:.03,d:.2,bp:500,q:4})}else if(L3.ins>=4)l3PowerOn();else caption(`[${L3.ins} of 4. The lock panel stays dead.]`)},'note')}}
+    else prompt=`FUSE BOX · ${L3.ins}/4`}
+  const D=L3.door;if(D&&Math.hypot(D.pos.x-player.x,D.pos.z-player.z)<1.9&&look(D.pos,.3)){
+    if(L3.power){prompt='<kbd>E</kbd>OPEN THE STAIR DOOR';if(ePress){ePress=false;l3Escape();return''}}
+    else{prompt='LOCKED · NO POWER';if(ePress){ePress=false;if(AC){tone(master,{f:120,f2:90,type:'square',v:.05,d:.15,bp:400,q:3});hiss(master,{f:900,q:2,v:.1,d:.2})}if(G.time-L3.lockedT>6){L3.lockedT=G.time;caption('[Locked. A red light by the handle. The fuse box by the lift must run it.]')}}}}
+  // people at the windows across the courtyard: there when you aren't looking straight at them
+  for(const p of L3.peri){const v=p.mesh.getWorldPosition(_e).sub(cp).normalize();const want=v.dot(cf)<.85?1:0;p.a+=(want-p.a)*(1-Math.exp(-dt*(want?1.2:14)));p.mesh.material.opacity=p.a;p.mesh.visible=p.a>.02}
   return prompt}
-function l3Pull(w){w.state='opening';w.t=0;L3.pulls++;const newSide=!L3.sides.has(w.side);L3.sides.add(w.side);l3Noise(w.pos.x,w.pos.z);if(AC){hiss(master,{f:2600,f2:900,q:.7,v:.18,d:.6,a:.05});tone(master,{f:600,f2:560,type:'square',v:.02,d:.3,bp:900,q:10})}
-  const pool=['yellow','tunnel','hotel','dark','figure'];let v=pick(pool);if(L3.pulls===1)v='yellow';w.view=v;w.vw.material.map=v==='figure'?L3TEX.views.figure[0]:L3TEX.views[v];w.vw.material.needsUpdate=true;
-  if(v==='figure'){SND.sting();caption('[Someone in the window beckons you in. No.]')}else if(v==='yellow')caption('[Behind the curtain: yellow wallpaper, a buzzing light. Level 0. Not that way.]');else if(v==='tunnel')caption('[Wet concrete and a red lamp. The tunnels. Not that way.]');else if(v==='hotel')caption('[An empty hotel room. The bed is made. The door is locked.]');else caption('[Nothing. Just dark, going back further than the building could.]');
-  if(L3.sides.size>=4&&!L3.exitWin)l3OpenExit(w);else if(newSide&&L3.sides.size>1)setTimeout(()=>{if(G.lvl===2&&L3.on&&!L3.exitWin)caption(`[${4-L3.sides.size} side${L3.sides.size===3?'':'s'} of the courtyard left to look.]`)},2200)}
-function l3OpenExit(near){const os={0:1,1:0,2:3,3:2}[near.side];const opp=L3.win.filter(x=>x.state==='closed'&&x.side===os);const w=pick(opp.length?opp:L3.win.filter(x=>x.state==='closed'));if(!w)return;
-  L3.exitWin=w;w.state='opening';w.t=0;w.view='exit';w.vw.material.map=L3TEX.views.exit;w.vw.material.needsUpdate=true;w.curs.forEach(c=>c.material.color.setHex(0xffd0a0));
-  const rain=new THREE.Mesh(new THREE.PlaneGeometry(1.76,2.26),new THREE.MeshBasicMaterial({map:L3TEX.rain.clone(),transparent:true,depthWrite:false,toneMapped:false}));rain.material.map.needsUpdate=true;rain.position.z=.04;w.g.add(rain);w.rain=rain;
-  exitLight.color.setHex(0xffa050);exitLight.position.copy(w.pos).addScaledVector(w.n,.6).setY(2.2);exitLight.intensity=6;exitLight.distance=14;
-  L3.awake=true;G3.state='roar';G3.t=0;G3.noise=w.pos.clone();G3.noiseT=G.time;setTimeout(()=>{},0);
-  caption('[Across the courtyard, a pair of curtains blow open on their own. Rain. A street lamp. Outside.]');setTimeout(()=>{if(G.lvl===2&&L3.on)caption('[It knows too. RUN.]')},2600);SND.door();l3Roar()}
-function updateL3World(dt){// dust, rain, lamps
-  const D=L3.dust;if(D&&D.visible){D.userData.life-=dt;const P=D.geometry.attributes.position,V=D.userData.v;for(let i=0;i<P.count;i++){V[i*3+1]-=9*dt;let y=P.getY(i)+V[i*3+1]*dt;if(y<.05){y=.05;V[i*3+1]=0;V[i*3]*=.5;V[i*3+2]*=.5}P.setXYZ(i,P.getX(i)+V[i*3]*dt,y,P.getZ(i)+V[i*3+2]*dt)}P.needsUpdate=true;D.material.opacity=clamp(D.userData.life/2.2,0,.7);if(D.userData.life<=0)D.visible=false}
-  if(L3.exitWin&&L3.exitWin.rain)L3.exitWin.rain.material.map.offset.y+=dt*2.5}
-function l3Lights(dt){// the lit ground floor windows near you throw a little warm light under the arcade
-  const near=L3.win.filter(w=>w.lit||w.state!=='closed').map(w=>[w,Math.hypot(w.pos.x-player.x,w.pos.z-player.z)]).filter(a=>a[1]<14).sort((a,b)=>a[1]-b[1]).slice(0,4);
-  near.forEach(([w],i)=>{const L=DYN[i].L;L.color.setHex(w.view==='exit'?0xffa050:w.view==='figure'?0xff4030:0xffc880);L.distance=6;L.decay=1.6;L.position.copy(w.pos).addScaledVector(w.n,.3).setY(2);L.intensity=w.state==='closed'?.9:1.8})}
-function updateL3Play(dt,cp,cf){updateL3(dt);updateL3World(dt);return l3Windows(dt,cp,cf)}
+function l3PowerOn(){L3.power=true;L3.awake=true;SND.thunk();G.shake=Math.max(G.shake,.6);if(AC){tone(master,{f:60,v:.12,d:2.5,a:.3});tone(master,{f:120,v:.05,d:2.5,a:.3})}
+  L3.lamps.forEach(l=>l.alive=true);if(L3.door){L3.door.lamp.material.color.setHex(0x30ff60);L3.door.sign.material.color.setHex(0xffffff)}
+  caption('[Every light in the building comes on at once. Far off, on the north side, a lock clunks open.]');
+  setTimeout(()=>{if(G.lvl===2&&L3.on){l3Roar();G3.state='search';G3.t=0;G3.lastW=1;G3.lastU=0;G3.sus=.6;caption('[It saw the lights come on. Get to the north stair door. RUN.]')}},2200)}
+function l3Hud(){if(L3.power)return'RUN TO THE NORTH STAIR DOOR';if(L3.got>=4&&L3.ins<4)return'FUSES 4/4 · BACK TO THE FUSE BOX';return`FUSES ${L3.got}/4${L3.got>L3.ins?' · IN YOUR POCKET: '+(L3.got-L3.ins):''}`}
+function updateL3World(dt){// glass, eyes
+  const D=L3.dust;if(D&&D.visible){D.userData.life-=dt;const P=D.geometry.attributes.position,V=D.userData.v;for(let i=0;i<P.count;i++){V[i*3+1]-=9*dt;let y=P.getY(i)+V[i*3+1]*dt;if(y<.03){y=.03;V[i*3+1]=0;V[i*3]*=.4;V[i*3+2]*=.4}P.setXYZ(i,P.getX(i)+V[i*3]*dt,y,P.getZ(i)+V[i*3+2]*dt)}P.needsUpdate=true;D.material.opacity=clamp(D.userData.life/2,0,.8);if(D.userData.life<=0)D.visible=false}}
+function l3Lights(dt){// the corridor lamps nearest you (most are dead until the power comes back)
+  const near=L3.lamps.map(l=>[l,Math.hypot(l.pos.x-player.x,l.pos.z-player.z)]).filter(a=>a[1]<20).sort((a,b)=>a[1]-b[1]);
+  L3.lamps.forEach(l=>{l.on=0});near.filter(a=>a[0].alive).slice(0,4).forEach(([l],i)=>{const L=DYN[i].L;const fl=L3.power?1:(Math.sin(G.time*7+l.ph)>.92?.2:1)*(.55+.1*Math.sin(G.time*2.3+l.ph));
+    L.color.setHex(0xffcf90);L.distance=L3.power?9:6.5;L.decay=1.5;L.position.copy(l.pos);L.intensity=(L3.power?3.2:1.4)*fl;l.on=fl});
+  for(let i=near.filter(a=>a[0].alive).slice(0,4).length;i<4;i++)DYN[i].L.intensity=0;
+  L3.lamps.forEach(l=>{l.m.emissiveIntensity=l.alive?(l.on||(L3.power?1:.5))*2:0})}
+function updateL3Play(dt,cp,cf){updateL3(dt);updateL3World(dt);return l3Interact(dt,cp,cf)}
 function enterL3(fromCut){
   endCleanup();KC.buf=[];clearLevelItems();G.lvl=2;if(SMR.ok)SMR.root.visible=false;exitDoor=null;exitLight.intensity=0;l3Light();
   buildL3();if(!FIN.gs){FIN.gs=new THREE.Group();scene.add(FIN.gs)}FIN.gs.visible=true;FIN.gs.scale.setScalar(GSC);if(CR){FIN.gs.add(CR.root);CR.root.visible=true}
-  L3.on=true;MON.visible=true;MON.frozen=false;BRAIN.silentT=0;l3GiantReset(false);if(AC)monBus.gain.value=2.4;
-  player.x=0;player.z=31.6;player.yaw=0;player.pitch=0;player.y=EYE;player.px=undefined;Object.assign(G,{crouch:false,light:true,batt:Math.max(G.batt,75),flickOff:0,fq:[],explored:new Uint8Array(GW*GH),trail:[],stunT:0});
+  L3.on=true;L3.light.visible=true;L3.moon.visible=true;MON.visible=true;MON.frozen=false;BRAIN.silentT=0;l3GiantReset(1,-14);G3.graceT=6;if(AC)monBus.gain.value=2.4;
+  l3Spawn();Object.assign(G,{light:true,batt:Math.max(G.batt,75),flickOff:0,fq:[],explored:new Uint8Array(GW*GH),trail:[],stunT:0});
   for(let i=0;i<4;i++)l3GiantPose(1/30);l3Beam(0)}
-function startL3(){// from the freight lift in level 2: ride down, then step out into the courtyard
+function startL3(){// from the freight lift in level 2: ride down, then step out into the hotel
   VM.reach=null;if(G.mapOpen)toggleMap(false);initAudio();enterL3(true);cutLift()}
-function l3Card(){levelCard('LEVEL 188: THE WINDOWS','LEVEL 3',`<p>A courtyard as big as a city block, walled in by a hotel that goes up five floors. Hundreds of windows. Most have their curtains drawn. Some of them open onto other places.</p>
-  <p>The thing from the carpet stands in the middle. It's taller than the building now. It turns slowly, and <b>its eyes throw light</b>. If the light settles on you, it reaches down for you.</p>
-  <p>Stay out of the light: deep under the arcade roof, behind the hedges, under the gazebos. Pull back a curtain on every side of the courtyard: the way out only shows itself once you have looked everywhere. It hears the curtains.</p>
-  <div class="ctrl"><kbd>E</kbd>pull curtains <kbd>C</kbd>crouch: harder to see <kbd>SHIFT</kbd>run: easier to see · when a red ring opens around you, move.</div>`,'▶ STEP OUT',()=>{startPlay();caption('[The lift doors shut behind you.]')})}
+function l3Card(){levelCard('LEVEL 188: THE WINDOWS','LEVEL 3',`<p>The ground floor of a hotel that goes all the way round a courtyard. One long corridor, windows on one side, rooms on the other. Five floors of windows look back at you across the yard.</p>
+  <p>The thing from the carpet is out there. It's taller than the building now. <b>Its eyes throw a white beam</b>, and it drags that beam along the windows, one wing at a time. If the beam settles on you, it reaches in.</p>
+  <p>Find the <b>four fuses</b>, one in each wing, and bring them to the fuse box by the lift. That unlocks the <b>north stair door</b>. Run past the light, duck into the rooms, close the curtains ahead of it.</p>
+  <div class="ctrl"><kbd>E</kbd>curtains · fuses <kbd>C</kbd>crouch: harder to spot <kbd>SHIFT</kbd>run: it can hear you · flashlight off: harder to spot</div>`,'▶ STEP OUT',()=>{startPlay();caption('[The lift shudders and goes dark behind you. That way is gone.]')})}
 
 /* ============ CUTSCENES: the moments between the levels ============ */
 const CUT={on:false,t:0,dur:0,upd:null,end:null,grind:null};
@@ -2922,28 +2993,44 @@ function cutStairs(done){
     setFade(t<.4?1-t/.4:t>12.2?(t-12.2)/.8:0);if(t>12.2&&!cues.click2){cues.click2=1;SND.click()}},
     ()=>{levelGroup.remove(grp);exitLight.intensity=0;done()})}
 // level 2 -> level 3: the freight lift goes down for a long time, then opens on the courtyard
-function cutLift(){const Lf=L3.lift;const cues={};Lf.shaft.visible=true;Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*.75);Lf.gate.position.x=0;Lf.gate.visible=true;CUT.grind=grindLoop();
-  const K=[[0,.3,1.6,36.6,0,-.05],[5.5,.3,1.6,36.6,.15,-.05],[6.8,0,1.6,36.4,0,0],[8.4,0,1.62,35.2,0,.05],[10.6,0,1.62,26.5,0,.25],[12.4,0,1.62,24.6,0,.55],[15.5,0,1.62,24.2,0,.58]];
+function cutLift(){const Lf=L3.lift,k=L3.k,Z=k.cOw,dz=Z-34;const cues={};Lf.shaft.visible=true;Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*.75);Lf.gate.position.x=0;Lf.gate.visible=true;CUT.grind=grindLoop();
+  // the giant waits out in front of the south wing, dragging its beam along the windows
+  G3.wing=1;G3.pos.copy(l3Stand(1,21,0));G3.yaw=0;G3.stand=.12;L3.win.filter(w=>w.i===1&&Math.abs(w.u)<1).forEach(w=>{w.want=0;w.k=0;l3Curtain(w,0)});
+  const K=[[0,.3,1.6,Z+2.6,0,-.05],[5.5,.3,1.6,Z+2.6,.15,-.05],[6.8,0,1.6,Z+2.4,0,0],[8.4,0,1.62,Z-.9,0,.02],[10.1,0,1.62,k.cRm+.3,0,.06],[11.3,0,1.62,L3.C+2.3,-.12,.16],[12.4,0,1.4,L3.C+1.35,0,.4],[15.5,0,1.32,L3.C+1.2,0,.46]];
   startCut(15.5,(t,dt)=>{camKeys(K,t);const desc=t<5.2;if(desc){camera.position.x+=(rnd()-.5)*.01;camera.position.y+=(rnd()-.5)*.012;Lf.shT.offset.y-=dt*2.8}
-    if(t>8.3&&t<10.6)cutBob(t,.8);
-    {const band=Math.pow(Math.max(0,Math.sin(t*5.7)),8)*(desc?1:0);const L4=DYN[4].L;L4.color.setHex(0xffd8a0);L4.distance=5;L4.decay=1.5;L4.position.set(0,1.6,34.6);L4.intensity=band*7;Lf.shaft.material.color.setScalar(.25+band*.9);if(desc)G.light=t<1.2||t>4.4}
-    const L=DYN[5].L;L.color.setHex(0xfff0c0);L.distance=6;L.decay=1.5;L.position.set(0,2.9,35.8);L.intensity=desc?(rnd()<.06?.2:3):2.6;Lf.bulb.visible=L.intensity>.3;
+    if(t>8.3&&t<11.3)cutBob(t,.8);
+    {const band=Math.pow(Math.max(0,Math.sin(t*5.7)),8)*(desc?1:0);const L4=DYN[4].L;L4.color.setHex(0xffd8a0);L4.distance=5;L4.decay=1.5;L4.position.set(0,1.6,34.6+dz);L4.intensity=band*7;Lf.shaft.material.color.setScalar(.25+band*.9);if(desc)G.light=t<1.2||t>4.4}
+    const L=DYN[5].L;L.color.setHex(0xfff0c0);L.distance=6;L.decay=1.5;L.position.set(0,2.9,35.8+dz);L.intensity=desc?(rnd()<.06?.2:3):t>9.5?Math.max(0,2.6-(t-9.5)*3):2.6;Lf.bulb.visible=L.intensity>.3;
     if(t>5.2&&!cues.stop){cues.stop=1;G.shake=1;SND.thunk();G.light=true;if(CUT.grind){CUT.grind.g.gain.setTargetAtTime(0,AC.currentTime,.05)}Lf.shaft.visible=false}
     if(t>5.8&&!cues.ding){cues.ding=1;tone(master,{f:1320,v:.08,d:.6});tone(master,{f:1760,v:.06,d:.9,delay:.25})}
     if(t>6.3){Lf.gate.position.x=lerp(0,-2.9,clamp((t-6.3)/.9,0,1));if(!cues.gate){cues.gate=1;hiss(master,{f:1400,q:3,v:.15,d:.8,a:.05})}}
-    if(t>7.1){const k=clamp((t-7.1)/1.2,0,1);Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*(.75+k*1.5));if(!cues.doors){cues.doors=1;SND.door()}}
-    // the giant: scanning the far side, then it turns its head, and its light, onto you
-    resetIntent();INTENT.stand=1;INTENT.noDrag=true;INTENT.limp=false;INTENT.hunch=.3;INTENT.jaw=.3;INTENT.tilt=Math.sin(t*.5)*.4;
-    if(t<11.2){G3.lookT.set(Math.sin(t*.25-1.2)*20,0,-12+Math.cos(t*.2)*6)}else{G3.lookT.set(camera.position.x,1.5,camera.position.z);INTENT.jaw=lerp(.3,1,clamp((t-11.2)/1.5,0,1));INTENT.tilt=.6*Math.sin((t-11.2)*1.3)}
-    G3.look.lerp(G3.lookT,1-Math.exp(-dt*(t<11.2?1.2:2.6)));G3.yaw+=clamp(angDiff(G3.yaw,Math.atan2(G3.lookT.x,G3.lookT.z)),-.5*dt,.5*dt);G3.vel.set(0,0,0);l3GiantPose(dt);l3Beam(dt);
+    if(t>7.1){const kk=clamp((t-7.1)/1.2,0,1);Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*(.75+kk*1.5));if(!cues.doors){cues.doors=1;SND.door()}}
+    if(t>9.5&&!cues.dead){cues.dead=1;SND.thunk();caption('[Behind you, the lift goes dark.]')}
+    // the giant: sweeping the far end of the wing, then it swings its beam, and its eyes, onto you
+    resetIntent();INTENT.noDrag=true;INTENT.limp=false;INTENT.hunch=.5;INTENT.leanF=.3;INTENT.jaw=.3;INTENT.tilt=Math.sin(t*.5)*.4;
+    if(t<11.4){G3.lookT.copy(l3Spot(1,-12+Math.sin(t*.22)*5))}else{G3.lookT.set(camera.position.x,1.2,camera.position.z);INTENT.jaw=lerp(.3,1,clamp((t-11.4)/1.5,0,1));INTENT.tilt=.5*Math.sin((t-11.4)*1.3)}
+    G3.stand=damp(G3.stand,t<11.4?.12:.04,2,dt);INTENT.stand=G3.stand;
+    G3.look.lerp(G3.lookT,1-Math.exp(-dt*(t<11.4?1.2:3)));G3.yaw+=clamp(angDiff(G3.yaw,Math.atan2(G3.lookT.x-G3.pos.x,G3.lookT.z-G3.pos.z)),-(t<11.4?.5:1.6)*dt,(t<11.4?.5:1.6)*dt);
+    if(t>10.6){const tp=l3Stand(1,16,0),d=tp.clone().sub(G3.pos);const sp=Math.min(d.length(),dt*3.5);if(d.length()>.01){G3.vel.copy(d).normalize().multiplyScalar(sp/dt);G3.pos.addScaledVector(d.normalize(),sp)}}else G3.vel.set(0,0,0);l3GiantPose(dt);l3Beam(dt);
     if(t>12.9&&!cues.lit){cues.lit=1;SND.sting();l3Roar();G.glitch=.8}
     setFade(t<.5?1-t/.5:t>14.6?(t-14.6)/.9:(t>12.9&&t<13.5)?(1-(t-12.9)/.6)*.7:0,t>12.9?'#fff':'#000')},
-    ()=>{DYN[4].L.intensity=0;DYN[5].L.intensity=0;Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*.75);l3GiantReset(false);G3.sus=0;player.x=0;player.z=31.6;player.yaw=0;player.pitch=.15;l3Card()})}
-// level 3 -> the ending: out through the open window, into the rain
-function l3ClimbOut(w){const p0=camera.position.clone(),yaw0=player.yaw;const tgt=w.pos.clone();const n=w.n;const wyaw=Math.atan2(n.x,n.z);const cues={};VM.reach=null;
-  const K=[[0,p0.x,p0.y,p0.z,yaw0,player.pitch],[.8,tgt.x+n.x*.6,1.5,tgt.z+n.z*.6,wyaw,-.25],[1.5,tgt.x+n.x*.1,1.95,tgt.z+n.z*.1,wyaw,-.5],[2.4,tgt.x-n.x*.9,1.5,tgt.z-n.z*.9,wyaw,-.1]];
-  startCut(2.6,(t,dt)=>{camKeys(K,t);if(t>1.2&&!cues.rain){cues.rain=1;hiss(master,{f:4200,q:.4,v:.25,d:2,a:.3})}G.glitch=Math.max(G.glitch,t>1.6?1:.3);setFade(t>1.8?(t-1.8)/.7:0,'#fff');
-    if(G3.state!=='scan'){G3.lookT.set(player.x,0,player.z);G3.look.lerp(G3.lookT,1-Math.exp(-dt*3));resetIntent();INTENT.stand=1;INTENT.noDrag=true;INTENT.limp=false;INTENT.jaw=1;INTENT.armsUp=.6;l3GiantPose(dt);l3Beam(dt)}},
+    ()=>{DYN[4].L.intensity=0;DYN[5].L.intensity=0;Lf.doors.forEach((d,i)=>d.position.x=(i?1:-1)*.75);Lf.bulb.visible=false;l3GiantReset(1,-16);G3.graceT=6;l3Spawn();l3Card()})}
+// level 3 -> the ending: through the north stair door, with the light coming in behind you
+function l3Escape(){const D=L3.door,k=L3.k;const p0=camera.position.clone(),yaw0=player.yaw,pt0=player.pitch;const cues={};VM.reach=null;
+  const zc=-(k.cRw-1.1),zi=-(k.cRm+.9),zs=-(k.cRm+2.2);
+  const K=[[0,p0.x,p0.y,p0.z,yaw0,pt0],[.8,0,1.6,zc,0,0],[1.7,0,1.6,zc-.3,0,0],[2.5,0,1.65,zi,0,.05],[3.4,0,1.7,zs,Math.PI*.98,.08],[4.6,0,1.7,zs-.2,Math.PI,.1]];
+  // it has already worked out where you are going: it's out in front of the north wing, peering in
+  G3.slam=null;G3.state='hunt';
+  startCut(5,(t,dt)=>{camKeys(K,t);if(t>.8&&t<2.6)cutBob(t,1);
+    const op=t<.9?0:t<1.7?(t-.9)/.8:t<3.9?1:Math.max(0,1-(t-3.9)/.35);D.piv.rotation.y=op*1.45;
+    if(t>.9&&!cues.open){cues.open=1;SND.door();hiss(master,{f:600,q:2,v:.12,d:.5})}
+    if(t>3.9&&!cues.slam){cues.slam=1;SND.thunk();G.shake=1;hiss(master,{ft:'lowpass',f:300,v:.8,d:.6})}
+    if(t>2.5&&!cues.glass){cues.glass=1;const w=L3.win.find(w=>w.i===0&&Math.abs(w.u)<1);if(w&&w.state!=='torn'){w.state='torn';w.curs.forEach(c=>c.visible=false)}l3Glass();l3Roar();G.shake=Math.max(G.shake,.8)}
+    resetIntent();const I=INTENT;I.noDrag=true;I.limp=false;I.hunch=.2;I.jaw=1;I.leanF=.4;I.tilt=Math.sin(t*3)*.3;
+    const reach=t>2.2,want=reach?(()=>{const q=l3W(0,0,L3.C-7.2);return new V3(q.x,0,q.z)})():l3Stand(0,15,0);G3.pos.lerp(want,1-Math.exp(-dt*(reach?7:1.5)));G3.stand=damp(G3.stand,reach?0:.05,reach?8:2,dt);I.stand=G3.stand;
+    if(reach){const e=clamp((t-2.5)/1.1,0,1),ee=e*e*(3-2*e);const win=new V3(0,1.4,-(L3.C+.5)),door=new V3(-.3,1.1,-(k.cRw-.25));I.grip[0]=win.clone().lerp(door,ee).multiplyScalar(1/GSC);I.gripDir[0]=new V3(0,-.5,-1).normalize();I.curl[0]=.35;I.grip[1]=new V3(1.4,1.0,-(L3.C+.4)).multiplyScalar(1/GSC);I.gripDir[1]=new V3(0,-1,-.3).normalize();I.curl[1]=.9}
+    if(reach)G3.lookT.set(0,1,-(k.cRw-.3));else G3.lookT.set(camera.position.x,1,camera.position.z);G3.look.lerp(G3.lookT,1-Math.exp(-dt*4));G3.yaw+=clamp(angDiff(G3.yaw,Math.atan2(G3.lookT.x-G3.pos.x,G3.lookT.z-G3.pos.z)),-1*dt,1*dt);G3.vel.set(0,0,0);l3GiantPose(dt);l3Beam(dt);
+    G.glitch=Math.max(G.glitch,t>2.6&&t<3.9?.5:.1);setFade(t>4.0?(t-4.0)/.6:0,'#000')},
     ()=>{finaleReset();G.lvl=0;levelGroup.clear();startEnding()})}
 
 
@@ -2963,13 +3050,13 @@ const haveMon=()=>!!CR&&worldReady,haveSmile=()=>haveMon()&&SMR.ok;
 function stageMenu(){menuCard('STAGE SELECT','SKIP AHEAD',[
   {name:'LEVEL 0 · THE CARPET',sub:'notes, the exit, the one that freezes in your light',ok:haveMon,go:()=>{newGame();finishIntro()}},
   {name:'LEVEL 2 · SERVICE TUNNELS',sub:'the blind one that hunts by sound, three breakers',ok:haveSmile,go:()=>{freshRun();enterLevel2(false);G.state='card';$('hud').hidden=true;l2Card()}},
-  {name:'LEVEL 3 · THE WINDOWS',sub:'the courtyard, the giant, the curtains',ok:haveMon,go:()=>{freshRun();enterL3();G.state='card';$('hud').hidden=true;l3Card()}}])}
+  {name:'LEVEL 3 · THE WINDOWS',sub:'the hotel, the giant at the windows, four fuses',ok:haveMon,go:()=>{freshRun();enterL3();G.state='card';$('hud').hidden=true;l3Card()}}])}
 function cutMenu(){menuCard('CUTSCENES','THE TAPE, REWOUND',[
   {name:'THE BASEMENT',sub:'how you got in',ok:haveMon,go:()=>{newGame();VIEWER.on=true}},
   {name:'THE STAIRWELL',sub:'level 0 to level 2',ok:haveSmile,go:()=>{freshRun();VIEWER.on=true;enterLevel2(true)}},
   {name:'THE FREIGHT LIFT',sub:'level 2 to level 3',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;startL3()}},
-  {name:'OUT THE WINDOW',sub:'leaving the courtyard',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;enterL3();l3OpenExit(L3.win[0]);const w=L3.exitWin;
-    player.x=w.pos.x+w.n.x*1.6;player.z=w.pos.z+w.n.z*1.6;player.yaw=Math.atan2(w.n.x,w.n.z);player.pitch=0;G.state='play';placeCamera(0);camera.updateMatrixWorld();G.caps=[];$('captions').innerHTML='';l3ClimbOut(w)}},
+  {name:'THE STAIR DOOR',sub:'getting out of the windows',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;enterL3();L3.power=true;L3.awake=true;
+    player.x=-1.5;player.z=-(L3.k.cRw-1.6);player.yaw=-.4;player.pitch=0;G.state='play';placeCamera(0);camera.updateMatrixWorld();G3.pos.copy(l3Stand(0,15,0));G.caps=[];$('captions').innerHTML='';l3Escape()}},
   {name:'THE ENDING',sub:'the parking lot, and the tape three weeks later',ok:haveMon,go:()=>{freshRun();VIEWER.on=true;startEnding()}}])}
 // when a scene being watched hands over to gameplay (or ends), go back to the title instead
 function viewerTick(){if(!VIEWER.on)return;if(['play','card','end','dead'].includes(G.state)){VIEWER.on=false;returnToTitle()}}
@@ -3173,9 +3260,9 @@ if(DEBUG)window.__dbg=function(mode,secs){
 };
 function initAudioStub(){}
 if(DEBUG){window.__lvl2=()=>{enterLevel2();return{start:START,brk:L2.breakers.length,lamps:L2.lamps.length,smile:SMR.ok,sm:SMR.pos.toArray()}};
-  window.__l3=()=>{enterL3();startPlay();return{win:L3.win.length,col:L3.col.length,cov:L3.cov.length,cr:!!CR}};window.__startL3=startL3;window.__cutMenu=cutMenu;window.__stageMenu=stageMenu;window.__viewer=VIEWER;window.__vmReach=()=>VM.reach?{kind:VM.reach.kind,t:+VM.reach.t.toFixed(2)}:null;window.__startL2=startLevel2;window.__hands=()=>['HandL_011','HandR_024','ArmL_09','ArmR_022'].map(n=>CR.B[n].getWorldPosition(new V3()).toArray().map(v=>v.toFixed(1)).join(',')).join(' | ');window.__L3=L3;window.__G3=G3;window.__cut=CUT;window.__endCut=endCut;
+  window.__l3=()=>{enterL3();startPlay();return{fuses:L3.fuses.length,win:L3.win.length,col:L3.col.length,cov:L3.cov.length,cr:!!CR}};window.__startL3=startL3;window.__cutMenu=cutMenu;window.__stageMenu=stageMenu;window.__viewer=VIEWER;window.__vmReach=()=>VM.reach?{kind:VM.reach.kind,t:+VM.reach.t.toFixed(2)}:null;window.__startL2=startLevel2;window.__hands=()=>['HandL_011','HandR_024','ArmL_09','ArmR_022'].map(n=>CR.B[n].getWorldPosition(new V3()).toArray().map(v=>v.toFixed(1)).join(',')).join(' | ');window.__L3=L3;window.__CR=()=>CR;window.__L3EYE=L3EYE;window.__l3Eyes=l3Eyes;window.__l3Smash=(i,u)=>{G3.state='hunt';G3.lastW=i;G3.lastU=u;l3Smash(L3.win.find(w=>w.i===i&&w.u===u))};window.__l3Escape=l3Escape;window.__l3Power=()=>{L3.got=L3.ins=4;l3PowerOn()};window.__l3Dbg=()=>{const E=l3Eyes(),b=new V3(player.x,1.15,player.z);const hits=L3.cov.filter(B=>segBox(E.c,b,B));const cw=L3.win.filter(w=>w.state!=='torn'&&w.k>.75&&segBox(E.c,b,w.cov)).map(w=>w.u);return JSON.stringify({eye:E.c,look:G3.look,hits,cw,ang:Math.acos(clamp(b.clone().sub(E.c).normalize().dot(G3.look.clone().sub(E.c).normalize()),-1,1)),la:L3.light.angle})};window.__G3=G3;window.__cut=CUT;window.__endCut=endCut;
   window.__smFront=(d,state)=>{smPlace(player.x-Math.sin(player.yaw)*d,player.z-Math.cos(player.yaw)*d,player.yaw);SMAI.state=state||'listen';SMAI.listen=99;SMR.root.visible=true;return true};
-  window.__state=()=>({lvl:G.lvl,state:G.state,brk:G.brk,exit:!!exitDoor,sm:SMR.ok?{x:+SMR.pos.x.toFixed(1),z:+SMR.pos.z.toFixed(1),st:SMAI.state,sp:+SMR.speed.toFixed(2)}:null,p:{x:+player.x.toFixed(1),z:+player.z.toFixed(1),y:+player.y.toFixed(2)},l3:L3.on?{st:G3.state,sus:+G3.sus.toFixed(2),gx:+G3.pos.x.toFixed(1),gz:+G3.pos.z.toFixed(1),pulls:L3.pulls,sides:L3.sides.size,exit:!!L3.exitWin,awake:L3.awake}:null,tapes:G.tapes});
+  window.__state=()=>({lvl:G.lvl,state:G.state,brk:G.brk,exit:!!exitDoor,sm:SMR.ok?{x:+SMR.pos.x.toFixed(1),z:+SMR.pos.z.toFixed(1),st:SMAI.state,sp:+SMR.speed.toFixed(2)}:null,p:{x:+player.x.toFixed(1),z:+player.z.toFixed(1),y:+player.y.toFixed(2)},l3:L3.on?{st:G3.state,sus:+G3.sus.toFixed(2),gx:+G3.pos.x.toFixed(1),gz:+G3.pos.z.toFixed(1),wing:G3.wing,got:L3.got,ins:L3.ins,power:L3.power,awake:L3.awake,lit:L3.lit}:null,tapes:G.tapes});
   window.__vhs=v=>{VHS.enabled=v};window.__card2=startLevel2;window.__keys=keys;window.__smKill=t=>{beginSmileKill();for(let i=0;i<t*30;i++)window.__frame(1/30);return G.state};window.__clearWalls=()=>{for(let y=1;y<GH;y++)for(let x=0;x<GW;x++)hE[hI(x,y)]=0;for(let y=0;y<GH;y++)for(let x=1;x<GW;x++)vE[vI(x,y)]=0;hD.fill(0);vD.fill(0);pillars=[];buildLevel();player.x=player.z=16*CS;return true};window.__smYaw=y=>{SMR.yaw=y;smSnap();return true};
   window.__throwAll=()=>{L2.breakers.forEach(b=>throwBreaker(b));return G.brk};
   window.__toExit=()=>{if(!exitDoor)return false;player.x=exitDoor.x+exitDoor.nx*.9;player.z=exitDoor.z+exitDoor.nz*.9;player.yaw=Math.atan2(exitDoor.nx,exitDoor.nz);return true};}
