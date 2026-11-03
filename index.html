@@ -363,7 +363,9 @@ function normalizeCamcorder(gltf){
   const grp=new THREE.Group();
   for(const p of parts){p.g.applyMatrix4(m);p.g.computeVertexNormals();p.g.computeBoundingBox();p.g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({map:p.mat.map,roughness:.55,metalness:.08,side:THREE.DoubleSide});const mesh=new THREE.Mesh(p.g,mat);mesh.frustumCulled=false;grp.add(mesh)}
   const box=new THREE.Box3();const pts=[];for(const p of parts){const a=p.g.attributes.position;for(const k of new Set(p.g.index.array)){const q=new V3().fromBufferAttribute(a,k);box.expandByPoint(q);pts.push(q)}}
-  const Wd=box.max.x-box.min.x;const sel=pts.filter(q=>q.x<box.min.x+.24*Wd&&q.y>box.min.y+.15*(box.max.y-box.min.y));let lcd=null;
+  const Wd=box.max.x-box.min.x;// the flip-out screen: find it by where it sits in the scan's texture (survives the mesh being simplified), else by shape
+  const uvSel=[];for(const p of parts){const a=p.g.attributes.position,uv=p.g.attributes.uv;if(!uv)continue;for(const k of new Set(p.g.index.array)){const u=uv.getX(k),v=uv.getY(k);if(u>.405&&u<.475&&v>.065&&v<.16)uvSel.push(new V3().fromBufferAttribute(a,k))}}
+  const sel=uvSel.length>40?uvSel:pts.filter(q=>q.x<box.min.x+.24*Wd&&q.y>box.min.y+.15*(box.max.y-box.min.y));let lcd=null;
   if(sel.length>50){const mean=new V3();sel.forEach(q=>mean.add(q));mean.divideScalar(sel.length);
     const C=[[0,0,0],[0,0,0],[0,0,0]];sel.forEach(q=>{const d=[q.x-mean.x,q.y-mean.y,q.z-mean.z];for(let a=0;a<3;a++)for(let b=0;b<3;b++)C[a][b]+=d[a]*d[b]});
     const mul=(M,v)=>[M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];const nr=v=>{const l=Math.hypot(...v);return v.map(x=>x/l)};
@@ -371,7 +373,8 @@ function normalizeCamcorder(gltf){
     const n=new V3().crossVectors(new V3(...e1),new V3(...e2)).normalize();if(n.z<0)n.negate();
     const upv=new V3(0,1,0).addScaledVector(n,-n.y).normalize(),rt=new V3().crossVectors(upv,n).normalize();
     let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9,w1=-1e9;pts.forEach(q=>{if(q.x>box.min.x+.5*Wd)return;const d=q.clone().sub(mean);const w=d.dot(n);if(Math.abs(w)>.0035)return;u0=Math.min(u0,d.dot(rt));u1=Math.max(u1,d.dot(rt));v0=Math.min(v0,d.dot(upv));v1=Math.max(v1,d.dot(upv));if(w>w1)w1=w});
-    const pw=u1-u0,ph=v1-v0;const sw=pw*.74,sh=ph*.78;const cu=u0+pw*.15+sw/2,cvv=(v0+v1)/2;
+    let pw=u1-u0,ph=v1-v0,sw=pw*.74,sh=ph*.78,cu=u0+pw*.15+sw/2,cvv=(v0+v1)/2;
+    if(sel===uvSel){let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;sel.forEach(q=>{const d=q.clone().sub(mean);a0=Math.min(a0,d.dot(rt));a1=Math.max(a1,d.dot(rt));b0=Math.min(b0,d.dot(upv));b1=Math.max(b1,d.dot(upv))});sw=(a1-a0)*1.32;sh=(b1-b0)*1.42;cu=(a0+a1)/2;cvv=(b0+b1)/2}
     lcd={center:mean.clone().addScaledVector(rt,cu).addScaledVector(upv,cvv).addScaledVector(n,w1+.0042),normal:n,right:rt,up:upv,w:sw,h:sh}}
   return{grp,box,lcd}}
 const lcdRT=new THREE.WebGLRenderTarget(256,176);lcdRT.texture.colorSpace=THREE.LinearSRGBColorSpace;
